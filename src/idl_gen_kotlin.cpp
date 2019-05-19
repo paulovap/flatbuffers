@@ -86,7 +86,7 @@ static const LanguageParameters lang_ = {
     "",
     "_bb.order(ByteOrder.LITTLE_ENDIAN); ",  // set_bb_byteorder
     "position()",                            // get_bb_position
-    "offset()",
+    "offset()", //get_fbb_offset
     "",  // accessor_prefix
     "",  // accessor_prefix_static
     "",  // optional_suffix
@@ -222,15 +222,11 @@ class KotlinGenerator : public BaseGenerator {
   std::string GenTypePointer(const Type &type) const {
     switch (type.base_type) {
       case BASE_TYPE_STRING:
-        return lang_.string_type;
+        return "String";
       case BASE_TYPE_VECTOR:
         return GenTypeGet(type.VectorType());
       case BASE_TYPE_STRUCT:
         return WrapInNameSpace(*type.struct_def);
-      case BASE_TYPE_UNION:
-        // Unions in C# use a generic Table-derived type for better type safety
-        if (lang_.language == IDLOptions::kCSharp) return "TTable";
-        FLATBUFFERS_FALLTHROUGH();  // else fall thru
       default:
         return "Table";
     }
@@ -259,11 +255,6 @@ class KotlinGenerator : public BaseGenerator {
       default:
         return type;
     }
-  }
-
-  static std::string GenOffsetConstruct(const StructDef &struct_def,
-                                 const std::string &variable_name) {
-    return variable_name;
   }
 
   // Generate destination type name
@@ -316,7 +307,7 @@ class KotlinGenerator : public BaseGenerator {
             else if (type.base_type == BASE_TYPE_USHORT)
               return "(short)";
             else if (type.base_type == BASE_TYPE_UCHAR)
-              return "(byte)";
+              return "(Byte)";
           }
           break;
         case IDLOptions::kCSharp:
@@ -353,21 +344,12 @@ class KotlinGenerator : public BaseGenerator {
   std::string GenDefaultValue(const FieldDef &field,
                               bool enableLangOverrides) const {
     auto &value = field.value;
-    if (enableLangOverrides) {
-      // handles both enum case and vector of enum case
-      if (lang_.language == IDLOptions::kCSharp &&
-          value.type.enum_def != nullptr &&
-          value.type.base_type != BASE_TYPE_UNION) {
-        return GenEnumDefaultValue(field);
-      }
-    }
 
-    auto longSuffix = lang_.language == IDLOptions::kJava ? "L" : "";
+    auto longSuffix = "L";
     switch (value.type.base_type) {
       case BASE_TYPE_BOOL:
         return value.constant == "0" ? "false" : "true";
       case BASE_TYPE_ULONG: {
-        if (lang_.language != IDLOptions::kJava) return value.constant;
         // Converts the ulong into its bits signed equivalent
         uint64_t defaultValue = StringToUInt(value.constant.c_str());
         return NumToString(static_cast<int64_t>(defaultValue)) + longSuffix;
@@ -490,15 +472,15 @@ class KotlinGenerator : public BaseGenerator {
   std::string GenGetter(const Type &type) const {
     switch (type.base_type) {
       case BASE_TYPE_STRING:
-        return lang_.accessor_prefix + "__string";
+        return "__string";
       case BASE_TYPE_STRUCT:
-        return lang_.accessor_prefix + "__struct";
+        return "__struct";
       case BASE_TYPE_UNION:
-        return lang_.accessor_prefix + "__union";
+        return "__union";
       case BASE_TYPE_VECTOR:
         return GenGetter(type.VectorType());
       default: {
-        std::string getter = lang_.accessor_prefix + "bb.get";
+        std::string getter = "bb.get";
         if (type.base_type == BASE_TYPE_BOOL) {
           getter = "0!=" + getter;
         } else if (GenTypeBasic(type) != "byte") {
@@ -746,10 +728,10 @@ class KotlinGenerator : public BaseGenerator {
           (field.required ? "" : GenNullableAnnotation(field.value.type)) +
           type_name_dest + optional + " " +
           MakeCamel(field.name);
-      std::string obj = "obj";
-
+      
       // Most field accessors need to retrieve and test the field offset first,
       // this is the prefix code for that:
+      auto offset_val = NumToString(field.value.offset);
       auto offset_prefix = "val o = __offset(" +
                            NumToString(field.value.offset) +
                            "); return o != 0 ? ";
@@ -778,11 +760,9 @@ class KotlinGenerator : public BaseGenerator {
          });
       }
       std::string getter = dest_cast + GenGetter(field.value.type);
-      //code += method_start;
       std::string default_cast = "";
       std::string member_suffix = "; ";
       if (IsScalar(field.value.type.base_type)) {
-        code += lang_.getter_prefix;
         member_suffix += lang_.getter_suffix;
         if (struct_def.fixed) {
             code += GenerateGetter(1, field_name_camel, type_name, 
@@ -830,10 +810,8 @@ class KotlinGenerator : public BaseGenerator {
                                   type_name + "?", 
                                   [&](int ilvl, CodeWriter &writer){
                   auto fixed = field.value.type.struct_def->fixed;
-                  auto direct = "o + bb_pos";
-                  auto indirect = "__indirect(o + bb_pos)";
                   
-                  writer.SetValue("seek", fixed ? direct : indirect);
+                  writer.SetValue("seek", Indirect("o + bb_pos", fixed));
                   writer.SetValue("offset", NumToString(field.value.offset));
                   
                   writer += t(ilvl) + "val o = __offset({{offset}})";
@@ -846,16 +824,13 @@ class KotlinGenerator : public BaseGenerator {
             }
             break;
           case BASE_TYPE_STRING:
-            // create getter with object reuse
+            // create string getter
             // e.g.
-            //  fun pos(obj: Vec3) : Vec3? {
-            //      val o = __offset(4)
-            //      return if(o != 0) {
-            //          obj.__assign(o + bb_pos, bb)
-            //      else {
-            //          null
-            //      }
-            //  }
+            //      val Name : String?
+            //          get() = {
+            //              val o = __offset(10)
+            //              return if (o != 0) __string(o + bb_pos) else null
+            //          }
             // ? adds nullability annotation
             code += GenerateGetter(1, field_name_camel, type_name + "?", 
                                 [&](int ilvl, CodeWriter &writer){
@@ -867,62 +842,75 @@ class KotlinGenerator : public BaseGenerator {
             });
             break;
           case BASE_TYPE_VECTOR: {
-            code += "(" + type_name + " obj" + ")";
+            // e.g.
+            // public int inventory(int j) { int o = __offset(14); return o != 0 ? bb.get(__vector(o) + j * 1) & 0xFF : 0; }
+            
             auto vectortype = field.value.type.VectorType();
-            code += "(";
-            if (vectortype.base_type == BASE_TYPE_STRUCT) {
-              code += type_name + " obj, ";
-              getter = obj + ".__assign";
-            } else if (vectortype.base_type == BASE_TYPE_UNION) {
-              code += type_name + " obj, ";
+            std::string params = "j: Int";
+            std::string return_type = type_name;
+            
+            if (vectortype.base_type == BASE_TYPE_STRUCT || 
+                    vectortype.base_type == BASE_TYPE_UNION) {
+                params = "obj: " + type_name + ", j: Int";
+                // make return nullable for objects
+                return_type = return_type + "?";
             }
-            code += "int j)";
-            const auto body = offset_prefix + conditional_cast + getter + "(";
-            if (vectortype.base_type == BASE_TYPE_UNION) {
-              code += body + "obj, ";
-            } else {
-              code += body;
-            }
-            auto index = lang_.accessor_prefix + "__vector(o) + j * " +
-                         NumToString(InlineSize(vectortype));
-            if (vectortype.base_type == BASE_TYPE_STRUCT) {
-              code += vectortype.struct_def->fixed
-                          ? index
-                          : lang_.accessor_prefix + "__indirect(" + index + ")";
-              code += ", " + lang_.accessor_prefix + "bb";
-            } else if (vectortype.base_type == BASE_TYPE_UNION) {
-              code += index + " - " + lang_.accessor_prefix + "bb_pos";
-            } else {
-              code += index;
-            }
-            code += ")" + dest_mask + " : ";
-
-            code +=
-                field.value.type.element == BASE_TYPE_BOOL
-                    ? "false"
-                    : (IsScalar(field.value.type.element) ? default_cast + "0"
-                                                          : "null");
+            
+            code += GenerateFun(1, field_name_camel, params , 
+                                type_name + "?", 
+                                [&](int ilvl, CodeWriter &writer){
+                auto inline_size = NumToString(InlineSize(vectortype));
+                auto index = "__vector(o) + j * " + inline_size;
+                bool fixed = struct_def.fixed || 
+                        vectortype.base_type != BASE_TYPE_STRUCT;
+                
+                writer.SetValue("mask", dest_mask);
+                writer.SetValue("offset", NumToString(field.value.offset));
+                writer.SetValue("index", Indirect(index, fixed));
+                writer.SetValue("get_st", "obj.__assign");
+                writer.SetValue("get", getter);
+                
+                writer += t(ilvl) + "val o = __offset({{offset}})";
+                writer += t(ilvl) + "return if (o != 0) {";
+                
+                if (vectortype.base_type == BASE_TYPE_STRUCT) {
+                    writer += t(ilvl+1) + "{{get_st}}({{index}}, bb) {{mask}}";    
+                }
+                else if (vectortype.base_type == BASE_TYPE_UNION) {
+                  writer += t(ilvl+1) + "{{get}}({{index}} - bb_pos) {{mask}}";
+                } else {
+                   writer += t(ilvl+1) + "{{get}}({{index}}) {{mask}}"; 
+                }
+                writer += t(ilvl) + "else {";
+                writer += t(ilvl+1) + NotFoundReturn(field.value.type.element);
+                writer += t(ilvl) + "}";
+            });
             break;
           }
           case BASE_TYPE_UNION:
-            code += "(" + type_name + " obj" + ")";
-            code += "(" + type_name + " obj)" + offset_prefix + getter;
-            code += "(obj, o) : null";
+            code += GenerateFun(1, field_name_camel, "obj: " + type_name, 
+                                type_name + "?", 
+                                [&](int ilvl, CodeWriter &writer){
+                writer += t(ilvl) + OffsetWrapperOneLine(offset_val, 
+                                                         getter + "(obj, o)", 
+                                                         "null");
+            });
             break;
           default:
             FLATBUFFERS_ASSERT(0);
         }
       }
-      code += member_suffix;
-      code += "}\n";
+      
       if (field.value.type.base_type == BASE_TYPE_VECTOR) {
-        code += "  int " + MakeCamel(field.name, lang_.first_camel_upper);
-        code += "Length";
-        code += lang_.getter_prefix;
-        code += offset_prefix;
-        code += lang_.accessor_prefix + "__vector_len(o) : 0; ";
-        code += lang_.getter_suffix;
-        code += "}\n";
+          // Generate Lenght functions for vectors
+          // e.g. 
+          // public int weaponsLength() { int o = __offset(18); return o != 0 ? __vector_len(o) : 0; }
+          GenerateGetter(1, MakeCamel(field.name) + "Length", "Int", 
+                         [&](int ilvl, CodeWriter &writer){
+            writer += t(ilvl) + OffsetWrapperOneLine(offset_val, 
+                                                     "__vector_len(o)", "0");
+          });
+          
         // See if we should generate a by-key accessor.
         if (field.value.type.element == BASE_TYPE_STRUCT &&
             !field.value.type.struct_def->fixed) {
@@ -996,7 +984,7 @@ class KotlinGenerator : public BaseGenerator {
         code += nested_type_name + " obj";
         code += ") { int o = " + lang_.accessor_prefix + "__offset(";
         code += NumToString(field.value.offset) + "); ";
-        code += "return o != 0 ? " + conditional_cast + obj + ".__assign(";
+        code += "return o != 0 ? " + conditional_cast + "obj.__assign(";
         code += lang_.accessor_prefix;
         code += "__indirect(" + lang_.accessor_prefix + "__vector(o)), ";
         code += lang_.accessor_prefix + "bb) : null; }\n";
@@ -1191,7 +1179,7 @@ class KotlinGenerator : public BaseGenerator {
           code += ");  // " + field.name + "\n";
         }
       }
-      code += "    return " + GenOffsetConstruct(struct_def, "o") + "\n  }\n";
+      code += "    return o\n  }\n";
       if (parser_.root_struct_def_ == &struct_def) {
         std::string size_prefix[] = {"", "SizePrefixed"};
         for (int i = 0; i < 2; ++i) {
@@ -1286,7 +1274,7 @@ class KotlinGenerator : public BaseGenerator {
     writer += t(ilvl) + 
             "fun {{gr_method}}"
             "(_bb: ByteBuffer, obj: {{gr_name}}): {{gr_name}} {";
-    writer += t(ilvl+1) + lang_.set_bb_byteorder;
+    writer += t(ilvl+1) + "_bb.order(ByteOrder.LITTLE_ENDIAN);";
     writer += t(ilvl+1) + "return (obj.__assign(_bb.getInt(_bb.{{gr_bb_pos}})"
                                 " + _bb.{{gr_bb_pos}}, _bb))";
     writer += t(ilvl) + "}\n";
@@ -1300,8 +1288,7 @@ class KotlinGenerator : public BaseGenerator {
       code += "): Int {\n";
       GenStructBody(struct_def, code, "");
       code += "    return ";
-      code += GenOffsetConstruct(
-          struct_def, "builder." + std::string(lang_.get_fbb_offset));
+      code += "builder.offset()";
       code += "\n  }\n";
   }
   
@@ -1344,6 +1331,26 @@ class KotlinGenerator : public BaseGenerator {
       body(ilevel+1, code);
       code += t(ilevel) + "}";
       return code.ToString();
+  }
+  
+  static std::string OffsetWrapperOneLine(std::string offset, std::string found,
+                                          std::string not_found) {
+      return "val o = __offset(" + offset + "); return if (o != 0) " + found + 
+              " else " + not_found;
+  }
+  
+  static std::string Indirect(std::string index, bool fixed) {
+      // We apply __indirect() and struct is not fixed.
+      if (!fixed)
+          return "__indirect(" + index + ")";
+      return index;
+  }
+  static std::string NotFoundReturn(BaseType el) {
+      if (el == BASE_TYPE_BOOL)
+          return "false";
+      if (IsScalar(el))
+          return "0";
+      return "null";
   }
   
   // Ident code by adding spaces according to an ident level
