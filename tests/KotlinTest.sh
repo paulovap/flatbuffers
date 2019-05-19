@@ -1,5 +1,5 @@
-#!/bin/bash
-#
+#!/bin/sh
+
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,30 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
+echo Compile then run the Kotlin test.
 
-echo Compile then run the Java test.
+testdir=$(dirname $0)
+thisdir=$(pwd)
 
-java -version
-
-testdir="$(dirname "$0")"
-
-targetdir="${testdir}/target"
-
-if [[ -e "${targetdir}" ]]; then
-    echo "cleaning target"
-    rm -rf "${targetdir}"
+if [[ "$testdir" != "$thisdir" ]]; then
+	echo error: must be run from inside the ${testdir} directory
+	echo you ran it from ${thisdir}
+	exit 1
 fi
 
-mkdir -v "${targetdir}"
-
-if ! find "${testdir}/../java" -type f -name "*.class" -delete; then
-    echo "failed to clean .class files from java directory" >&2
+kotlinc KotlinTest.kt ${testdir}/../kotlin/* ${testdir}/MyGame/Example/*.kt -include-runtime -d KotlinTest.jar 
+if [ $? -ne 0 ]; then
+    echo "Failed Kotlin compilation, look into logs.txt for error output"
     exit 1
 fi
-
-javac -d "${targetdir}" -classpath "${testdir}/../java:${testdir}:${testdir}/namespace_test:${testdir}/union_vector" "${testdir}/JavaTest.java"
-
-(cd "${testdir}" && java -classpath "${targetdir}" JavaTest )
-
-rm -rf "${targetdir}"
+java -jar KotlinTest.jar
+if [ $? -ne 0 ]; then
+    echo "Failed Test compilation or failed tests"
+fi
