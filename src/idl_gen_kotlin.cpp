@@ -733,7 +733,7 @@ class KotlinGenerator : public BaseGenerator {
       auto &field = **it;
       if (field.deprecated) continue;
       GenComment(field.doc_comment, code_ptr, &lang_.comment_config, "  ");
-      std::string name_camel = MakeCamel(field.name);
+      std::string field_name_camel = MakeCamel(field.name);
       std::string type_name = GenTypeGet(field.value.type);
       std::string type_name_dest = GenTypeNameDest(field.value.type);
       std::string conditional_cast = "";
@@ -750,18 +750,18 @@ class KotlinGenerator : public BaseGenerator {
 
       // Most field accessors need to retrieve and test the field offset first,
       // this is the prefix code for that:
-      auto offset_prefix = " { int o = " + lang_.accessor_prefix + "__offset(" +
+      auto offset_prefix = "val o = __offset(" +
                            NumToString(field.value.offset) +
                            "); return o != 0 ? ";
       // Generate the accessors that don't do object reuse.
       if (field.value.type.base_type == BASE_TYPE_STRUCT) {
           // Calls the accessor that takes an accessor object with a new object.
-          // example: public Vec3 pos() { return pos(new Vec3()); }
+          // e.g. public Vec3 pos() { return pos(new Vec3()); }
           // val pos
           //     get() {
           //         return pos(Vec3())
           //     }
-          code += GenerateGetter(1, name_camel, type_name, 
+          code += GenerateGetter(1, field_name_camel, type_name, 
                                  [&](int ilvl, CodeWriter &writer){
               writer += t(ilvl) + "return {{name}}({{type}}())";
           });  
@@ -769,58 +769,105 @@ class KotlinGenerator : public BaseGenerator {
                  field.value.type.element == BASE_TYPE_STRUCT) {
         // Accessors for vectors of structs also take accessor objects, this
         // generates a variant without that argument.
-        code += method_start + "(int j) { return ";
-        code += MakeCamel(field.name, lang_.first_camel_upper);
-        code += "(new " + type_name + "(), j) }\n";
-
-      } else if (field.value.type.base_type == BASE_TYPE_UNION ||
-                 (field.value.type.base_type == BASE_TYPE_VECTOR &&
-                  field.value.type.VectorType().base_type == BASE_TYPE_UNION)) {
+        // e.g. fun weapons(j: Int) : Weapon { 
+        //          return weapons(Weapon(), j) }
+        //      }
+        code += GenerateFun(1,field_name_camel, "j: Int", type_name_dest, 
+                            [&](int ilvl, CodeWriter &writer){
+            writer += t(ilvl) + "return {{return_type}}(), j)";
+         });
       }
       std::string getter = dest_cast + GenGetter(field.value.type);
-      code += method_start;
+      //code += method_start;
       std::string default_cast = "";
       std::string member_suffix = "; ";
       if (IsScalar(field.value.type.base_type)) {
         code += lang_.getter_prefix;
         member_suffix += lang_.getter_suffix;
         if (struct_def.fixed) {
-          code += " { return " + getter;
-          code += "(" + lang_.accessor_prefix + "bb_pos + ";
-          code += NumToString(field.value.offset) + ")";
-          code += dest_mask;
+            code += GenerateGetter(1, field_name_camel, type_name, 
+                                   [&](int ilvl, CodeWriter &writer){
+                writer += t(ilvl) + "return " + getter + "(bb_pos + " + NumToString(field.value.offset) + ")" + dest_mask;
+            }); 
         } else {
-          code += offset_prefix + getter;
-          code += "(o + " + lang_.accessor_prefix + "bb_pos)" + dest_mask;
-          code += " : " + default_cast;
-          code += GenDefaultValue(field);
+            code += GenerateGetter(1, field_name_camel, type_name, 
+                                   [&](int ilvl, CodeWriter &writer){
+                writer += t(ilvl) + "val o = __offset(" + NumToString(field.value.offset) + ")";
+                writer += t(ilvl) + "return if(o != 0) " + getter + "(o + bb_pos)" + dest_mask + " else " + default_cast + GenDefaultValue(field);
+            });
         }
       } else {
         switch (field.value.type.base_type) {
           case BASE_TYPE_STRUCT:
-            code += "(" + type_name + " obj" + ")";
-
+            
             if (struct_def.fixed) {
-              code += " { return " + obj + ".__assign(" + lang_.accessor_prefix;
-              code += "bb_pos + " + NumToString(field.value.offset) + ", ";
-              code += lang_.accessor_prefix + "bb)";
+                // create getter with object reuse
+                // e.g.
+                //  fun pos(obj: Vec3) : Vec3? {
+                //      return obj.__assign(bb_pos + 4, bb)
+                //  }
+                // ? adds nullability annotation
+                code += GenerateFun(1, field_name_camel, "obj: " + type_name , 
+                                    type_name + "?", 
+                                    [&](int ilvl, CodeWriter &writer){
+                    writer.SetValue("offset", NumToString(field.value.offset));
+                    code += t(ilvl) + "return obj."
+                                      "__assign(bb_pos + {{offset}}, bb)";
+                });
             } else {
-              code += offset_prefix + conditional_cast;
-              code += obj + ".__assign(";
-              code += field.value.type.struct_def->fixed
-                          ? "o + " + lang_.accessor_prefix + "bb_pos"
-                          : lang_.accessor_prefix + "__indirect(o + " +
-                                lang_.accessor_prefix + "bb_pos)";
-              code += ", " + lang_.accessor_prefix + "bb) : null";
+              // create getter with object reuse
+              // e.g.
+              //  fun pos(obj: Vec3) : Vec3? {
+              //      val o = __offset(4)
+              //      return if(o != 0) {
+              //          obj.__assign(o + bb_pos, bb)
+              //      else {
+              //          null
+              //      }
+              //  }
+              // ? adds nullability annotation
+              code += GenerateFun(1, field_name_camel, "obj: " + type_name , 
+                                  type_name + "?", 
+                                  [&](int ilvl, CodeWriter &writer){
+                  auto fixed = field.value.type.struct_def->fixed;
+                  auto direct = "o + bb_pos";
+                  auto indirect = "__indirect(o + bb_pos)";
+                  
+                  writer.SetValue("seek", fixed ? direct : indirect);
+                  writer.SetValue("offset", NumToString(field.value.offset));
+                  
+                  writer += t(ilvl) + "val o = __offset({{offset}})";
+                  writer += t(ilvl) + "return if (o != 0) {";
+                  writer += t(ilvl+1) + "obj.__assign({{seek}}, bb)";
+                  writer += t(ilvl) + "else {";
+                  writer += t(ilvl+1) + "null";
+                  writer += t(ilvl) + "}";
+              });
             }
             break;
           case BASE_TYPE_STRING:
-            code += lang_.getter_prefix;
-            member_suffix += lang_.getter_suffix;
-            code += offset_prefix + getter + "(o + " + lang_.accessor_prefix;
-            code += "bb_pos) : null";
+            // create getter with object reuse
+            // e.g.
+            //  fun pos(obj: Vec3) : Vec3? {
+            //      val o = __offset(4)
+            //      return if(o != 0) {
+            //          obj.__assign(o + bb_pos, bb)
+            //      else {
+            //          null
+            //      }
+            //  }
+            // ? adds nullability annotation
+            code += GenerateGetter(1, field_name_camel, type_name + "?", 
+                                [&](int ilvl, CodeWriter &writer){
+                writer.SetValue("offset", NumToString(field.value.offset));
+                
+                writer += t(ilvl) + "val o = __offset({{offset}})";
+                writer += t(ilvl) + "return if (o != 0) __string(o + bb_pos)"
+                                    " else null";
+            });
             break;
           case BASE_TYPE_VECTOR: {
+            code += "(" + type_name + " obj" + ")";
             auto vectortype = field.value.type.VectorType();
             code += "(";
             if (vectortype.base_type == BASE_TYPE_STRUCT) {
@@ -858,6 +905,7 @@ class KotlinGenerator : public BaseGenerator {
             break;
           }
           case BASE_TYPE_UNION:
+            code += "(" + type_name + " obj" + ")";
             code += "(" + type_name + " obj)" + offset_prefix + getter;
             code += "(obj, o) : null";
             break;
@@ -1233,7 +1281,6 @@ class KotlinGenerator : public BaseGenerator {
     writer += t(ilvl+1) + "return {{gr_method}}(_bb, {{gr_name}}())";
     writer += t(ilvl) + "}\n";
  
-    
     // create method that allows object reuse
     // e.g. fun Monster getRootAsMonster(_bb: ByteBuffer, obj: Monster) {...}
     writer += t(ilvl) + 
@@ -1272,9 +1319,30 @@ class KotlinGenerator : public BaseGenerator {
       code.SetValue("name", name);
       code.SetValue("type", type);
       code += t(ilevel) + "val {{name}} : {{type}}";
-      code += t(ilevel+1) + "get() = {\n";
+      code += t(ilevel+1) + "get() = {";
       body(ilevel+2, code);
-      code += t(ilevel+1) + "}\n\n";
+      code += t(ilevel+1) + "}";
+      return code.ToString();
+  }
+  
+  static std::string GenerateFun(int ilevel, 
+                                    std::string name,
+                                    std::string params,
+                                    std::string returnType,  
+                                    CodeblockFunction body) {
+      // Generates Kotlin function
+      // e.g.: 
+      // fun path(j: Int): Vec3 { 
+      //     return path(Vec3(), j)
+      // }
+      CodeWriter code;   
+      code.SetValue("name", name);
+      code.SetValue("params", params);
+      code.SetValue("return_type", returnType
+                    );
+      code += t(ilevel) + "fun {{name}}({{params}}) : {{return_type}} {";
+      body(ilevel+1, code);
+      code += t(ilevel) + "}";
       return code.ToString();
   }
   
