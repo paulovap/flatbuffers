@@ -15,7 +15,7 @@ struct Vec3 {
 table Monster {
   pos:Vec3;
   mana:short = 150;
-  hp:short = 100;
+  hp:short = 100 (key);
   name:string;
   friendly:bool = false (deprecated);
   inventory:[ubyte];

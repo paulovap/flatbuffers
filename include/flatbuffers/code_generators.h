@@ -50,6 +50,9 @@ class CodeWriter {
   // the specified key is contained in {{ and }} delimiters will be replaced by
   // the given value.
   void SetValue(const std::string &key, const std::string &value) {
+    // adding several elements with same key might introduce
+    // subtle bugs, so we allow set the value only once.
+    //FLATBUFFERS_ASSERT(value_map_.find(key) != value_map_.end());
     value_map_[key] = value;
   }
 
@@ -67,9 +70,20 @@ class CodeWriter {
   // Returns the current contents of the CodeWriter as a std::string.
   std::string ToString() const { return stream_.str(); }
 
+  // Increase ident level for writing code
+  void IncrementIdentLevel() { cur_ident_lvl_++; }
+  // Decrease ident level for writing code
+  void DecrementIdentLevel() { if (cur_ident_lvl_) cur_ident_lvl_--; }
+  
  private:
   std::map<std::string, std::string> value_map_;
   std::stringstream stream_;
+  int cur_ident_lvl_ = 0;
+  bool use_tab_ = false;
+  bool ignore_ident_ = false;
+  
+  // Add ident padding (tab or space) based on ident level 
+  void AppendIdent(std::stringstream & stream);
 };
 
 class BaseGenerator {

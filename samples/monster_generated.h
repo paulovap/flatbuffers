@@ -289,6 +289,12 @@ struct Monster FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   bool mutate_hp(int16_t _hp) {
     return SetField<int16_t>(VT_HP, _hp, 100);
   }
+  bool KeyCompareLessThan(const Monster *o) const {
+    return hp() < o->hp();
+  }
+  int KeyCompareWithValue(int16_t val) const {
+    return static_cast<int>(hp() > val) - static_cast<int>(hp() < val);
+  }
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
   }
