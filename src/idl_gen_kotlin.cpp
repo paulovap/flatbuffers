@@ -29,7 +29,7 @@ namespace flatbuffers {
 
 using CodeblockFunction = std::function<void(CodeWriter &)>;
 
-static TypedFloatConstantGenerator JavaFloatGen("Double.", "Float.", "NaN",
+static TypedFloatConstantGenerator KotlinFloatGen("Double.", "Float.", "NaN",
                                                 "POSITIVE_INFINITY",
                                                 "NEGATIVE_INFINITY");
 
@@ -200,7 +200,7 @@ public:
         if (type.base_type == BASE_TYPE_VECTOR) {
             return DestinationCast(type.VectorType());
         } else if (type.base_type == BASE_TYPE_UINT){
-            return "(Long)";
+            return ".toLong()";
         }
         return "";
     }
@@ -208,9 +208,7 @@ public:
     // Cast statements for mutator method parameters.
     // In Java, parameters representing unsigned numbers need to be cast down to
     // their respective type. For example, a long holding an unsigned int value
-    // would be cast down to int before being put onto the buffer. In C#, one cast
-    // directly cast an Enum to its underlying type, which is essential before
-    // putting it onto the buffer.
+    // would be cast down to int before being put onto the buffer.
     static std::string SourceCast(const Type &type, bool castFromDest) {
         if (type.base_type == BASE_TYPE_VECTOR) {
             return SourceCast(type.VectorType(), castFromDest);
@@ -265,10 +263,16 @@ public:
         case BASE_TYPE_LONG:
             return value.constant + longSuffix;
         default:
-            if (IsFloat(value.type.base_type))
-                return JavaFloatGen.GenFloatConstant(field);
-            else
+            if (IsFloat(value.type.base_type)) {
+                auto val = KotlinFloatGen.GenFloatConstant(field);
+                if (value.type.base_type == BASE_TYPE_DOUBLE &&
+                        val.back() == 'f') {
+                    val.pop_back();
+                }
+                return val;
+            } else {
                 return value.constant;
+            }
         }
     }
     
@@ -369,9 +373,8 @@ public:
             return GenGetter(type.VectorType());
         default: {
             std::string getter = "bb.get";
-            if (type.base_type == BASE_TYPE_BOOL) {
-                getter = "0!=" + getter;
-            } else if (GenTypeBasic(type) != "Byte") {
+            if (GenTypeBasic(type) != "Byte" && 
+                    GenTypeBasic(type) != "Boolean") {
                 getter += MakeCamel(GenTypeBasic(type));
             }
             return getter;
@@ -390,7 +393,7 @@ public:
         if (GenTypeBasic(type) != "Byte") {
             getter += MakeCamel(GenTypeBasic(type));
         }
-        getter = dest_cast + getter + "(" + GenOffsetGetter(key_field, num) + ")" +
+        getter = getter + "(" + GenOffsetGetter(key_field, num) + ")" + dest_cast + 
                 dest_mask;
         return getter;
     }
@@ -761,15 +764,27 @@ public:
         GenerateFunOneLine(writer, "add" + MakeCamel(field.name, true), 
                            "builder: FlatBufferBuilder, " + secondArg, 
                            "", [&](CodeWriter &code){
+            auto method = GenMethod(field.value.type);
             code.SetValue("field_name", MakeCamel(field.name, false));
-            code.SetValue("method_name", GenMethod(field.value.type));
+            code.SetValue("method_name", method);
             code.SetValue("pos", field_pos);
             code.SetValue("default", GenDefaultValue(field, false));
-            code.SetValue("cast", SourceCastBasic(field.value.type));
+            
+            
+            //code.SetValue("special_cast", DefaultValueByteBuffer(method, field));
+            
             
             code += "builder.add{{method_name}}({{pos}}, \\";
             code += "{{field_name}}{{cast}}, {{default}}{{cast}})";
         });
+    }
+    
+    std::string DefaultValueByteBuffer(std::string method, 
+                                       const FieldDef &field) {
+        if (method == "Int") {
+            
+        }
+        return "";
     }
     
     // fun startMonster(builder: FlatBufferBuilder) = builder.startObject(11)
@@ -881,7 +896,8 @@ public:
             auto field_mask = DestinationMask(field.value.type, true);
             auto src_cast = SourceCast(field.value.type);
             auto dst_cast = DestinationCast(field.value.type);
-            auto getter = dst_cast + GenGetter(field.value.type);
+            auto getter = GenGetter(field.value.type);
+            auto getter_cast = TypeConversor(field_type, return_type);
             auto offset_val = NumToString(field.value.offset);
             auto offset_prefix = "val o = __offset(" + offset_val + "); return o != 0 ? ";
             
@@ -894,6 +910,7 @@ public:
             writer.SetValue("field_default", field_default);
             writer.SetValue("field_mask", field_mask);
             writer.SetValue("field_read_func", getter);
+            writer.SetValue("cast", getter_cast);
             
             // Generate the accessors that don't do object reuse.
             if (field.value.type.base_type == BASE_TYPE_STRUCT) {
@@ -902,7 +919,7 @@ public:
                 //     get() = pos(Vec3())
                 GenerateGetterOneLine(writer, 
                                       field_name, 
-                                      field_type + "?", [&](CodeWriter &writer){
+                                      return_type + "?", [&](CodeWriter &writer){
                     writer += "{{field_name}}({{field_type}}())";
                 });
             } else if (field.value.type.base_type == BASE_TYPE_VECTOR &&
@@ -918,15 +935,15 @@ public:
             
             if (IsScalar(field.value.type.base_type)) {
                 if (struct_def.fixed) {
-                    GenerateGetterOneLine(writer, field_name, field_type, 
+                    GenerateGetterOneLine(writer, field_name, return_type, 
                                    [&](CodeWriter &writer){
-                        writer += "{{field_read_func}}(bb_pos + {{offset}}){{field_mask}}";
+                        writer += "{{field_read_func}}(bb_pos + {{offset}}){{cast}}{{field_mask}}";
                     }); 
                 } else {
-                    GenerateGetter(writer, field_name, field_type, 
+                    GenerateGetter(writer, field_name, return_type, 
                                    [&](CodeWriter &writer){
                         writer += "val o = __offset({{offset}})";
-                        writer += "return if(o != 0) {{field_read_func}}(o + bb_pos){{field_mask}} else {{field_default}}";
+                        writer += "return if(o != 0) {{field_read_func}}(o + bb_pos){{cast}}{{field_mask}} else {{field_default}}";
                     });
                 }
             } else {
@@ -939,7 +956,7 @@ public:
                         //  fun pos(obj: Vec3) : Vec3? = obj.assign(bb_pos + 4, bb)
                         // ? adds nullability annotation
                         GenerateFunOneLine(writer, field_name, "obj: " + field_type , 
-                                    field_type + "?", 
+                                    return_type + "?", 
                                     [&](CodeWriter &writer){
                             writer += "obj.assign(bb_pos + {{offset}}, bb)";
                         });
@@ -956,21 +973,14 @@ public:
                         //  }
                         // ? adds nullability annotation
                         GenerateFun(writer, field_name, "obj: " + field_type, 
-                                    field_type + "?", [&](CodeWriter &writer){
+                                    return_type + "?", [&](CodeWriter &writer){
                             auto fixed = field.value.type.struct_def->fixed;
                             
                             writer.SetValue("seek", Indirect("o + bb_pos", fixed));
-                            
-                            writer += "val o = __offset({{offset}})";
-                            writer += "return if (o != 0) {";
-                            writer.IncrementIdentLevel();
-                            writer += "obj.assign({{seek}}, bb)";
-                            writer.DecrementIdentLevel();
-                            writer += "} else {";
-                            writer.IncrementIdentLevel();
-                            writer += "null";
-                            writer.DecrementIdentLevel();
-                            writer += "}";
+                            OffsetWrapper(writer, 
+                                          offset_val, 
+                                          "obj.assign({{seek}}, bb)", 
+                                          "null");
                         });
                     }
                     break;
@@ -983,7 +993,7 @@ public:
                     //              return if (o != 0) __string(o + bb_pos) else null
                     //          }
                     // ? adds nullability annotation
-                    GenerateGetter(writer, field_name, field_type + "?", 
+                    GenerateGetter(writer, field_name, return_type + "?", 
                                    [&](CodeWriter &writer){
                         
                         writer += "val o = __offset({{offset}})";
@@ -992,17 +1002,16 @@ public:
                     break;
                 case BASE_TYPE_VECTOR: {
                     // e.g.
-                    // public int inventory(int j) { int o = __offset(14); return o != 0 ? bb.get(__vector(o) + j * 1) & 0xFF : 0; }
+                    // fun inventory(int j) : Int { val o = __offset(14); return o != 0 ? bb.get(__vector(o) + j * 1).toInt().and(0xFF) : 0; }
                     
                     auto vectortype = field.value.type.VectorType();
                     std::string params = "j: Int";
-                    std::string nullable = "";
+                    std::string nullable = IsScalar(vectortype.base_type) ? "" 
+                                                                          : "?";
                     
                     if (vectortype.base_type == BASE_TYPE_STRUCT || 
                             vectortype.base_type == BASE_TYPE_UNION) {
                         params = "obj: " + field_type + ", j: Int";
-                        // make return nullable for objects
-                        nullable = "?";
                     }
                     
                     
@@ -1017,22 +1026,19 @@ public:
                         
                         writer.SetValue("index", Indirect(index, fixed));
                         
-                        writer += "val o = __offset({{offset}})";
-                        writer += "return if (o != 0) {";
-                        writer.IncrementIdentLevel();
-                        if (vectortype.base_type == BASE_TYPE_STRUCT) {
-                            writer += "obj.assign({{index}}, bb){{toType}}{{field_mask}}";    
-                        } else if (vectortype.base_type == BASE_TYPE_UNION) {
-                            writer += "{{field_read_func}}({{index}} - bb_pos){{toType}}{{field_mask}}";
-                        } else {
-                            writer += "{{field_read_func}}({{index}}){{toType}}{{field_mask}}"; 
+                        auto not_found = NotFoundReturn(field.value.type.element);
+                        auto found = "";
+                        switch(vectortype.base_type) {
+                        case BASE_TYPE_STRUCT:
+                            found = "obj.assign({{index}}, bb){{cast}}{{field_mask}}";
+                            break;
+                        case BASE_TYPE_UNION:
+                            found = "{{field_read_func}}({{index}} - bb_pos){{cast}}{{field_mask}}";
+                            break;
+                        default:
+                            found = "{{field_read_func}}({{index}}){{cast}}{{field_mask}}";
                         }
-                        writer.DecrementIdentLevel();
-                        writer += "} else {";
-                        writer.IncrementIdentLevel();
-                        writer += NotFoundReturn(field.value.type.element);
-                        writer.DecrementIdentLevel();
-                        writer += "}";
+                        OffsetWrapper(writer, offset_val, found, not_found);
                     });
                     break;
                 }
@@ -1066,14 +1072,34 @@ public:
                         auto &key_field = **kit;
                         if (key_field.key) {
                             auto qualified_name = WrapInNameSpace(sd);
-                            writer += "fun " +field_name + "ByKey(\\";
-                            writer += "key: " + GenTypeNameDest(key_field.value.type) + ") : " + qualified_name + "{\n" + offset_prefix + "\\";
-                            writer += qualified_name + ".__lookup_by_key(null, __vector(o), key, bb) : null";
-                            writer += "}";
+                            auto name = MakeCamel(field.name, false) + "ByKey";
+                            auto params = "key: " + GenTypeNameDest(key_field.value.type);
+                            auto return_type = qualified_name + "?";
+                            GenerateFun(writer,
+                                        name, 
+                                        params, 
+                                        return_type, 
+                                        [&] (CodeWriter &code) {
+                                OffsetWrapper(code, 
+                                              offset_val,
+                                              qualified_name +
+                                              ".__lookup_by_key(null, __vector(o), key, bb)", 
+                                              "null");
+                            });
                             
-                            writer += "fun " +field_name + "ByKey(\\";
-                            writer += "obj: " + qualified_name + ", key: " + GenTypeNameDest(key_field.value.type) + ") : " + qualified_name + "{\n" + offset_prefix + qualified_name + ".__lookup_by_key(obj, __vector(o), key, bb) : null; ";
-                            writer += "}\n";
+                            auto param2 = "obj: " + qualified_name + ", key: " + GenTypeNameDest(key_field.value.type);
+                            GenerateFun(writer,
+                                        name,
+                                        param2,
+                                        return_type,
+                                        [&](CodeWriter &code){
+                                OffsetWrapper(code, 
+                                              offset_val, 
+                                              qualified_name +
+                                              ".__lookup_by_key(obj, __vector(o), key, bb)", 
+                                              "null");
+                            });
+
                             break;
                         }
                     }
@@ -1110,18 +1136,29 @@ public:
                 });
             }
             
-            //TODO: PV not done
             // generate object accessors if is nested_flatbuffer
+            //fun testnestedflatbufferAsMonster() : Monster? { return testnestedflatbufferAsMonster(new Monster()); }
+            
             if (field.nested_flatbuffer) {
                 auto nested_type_name = WrapInNameSpace(*field.nested_flatbuffer);
                 auto nested_method_name =
                         field_name + "As" +
                         nested_type_name;
-                auto get_nested_method_name = nested_method_name;
                 
-                writer += nested_type_name + " " + nested_method_name + "() { return " + get_nested_method_name + "(" + nested_type_name + "()) }";
-                writer += nested_type_name + " " + get_nested_method_name + "(" + nested_type_name + " obj"") { int o = __offset({{offset}}); ";
-                writer += "return o != 0 ? obj.assign(__indirect(__vector(o)), bb) : null; }";
+                GenerateGetterOneLine(writer, 
+                                      nested_method_name, 
+                                      nested_type_name + "?",
+                                      [&](CodeWriter &code){
+                    code += nested_method_name + "(" + nested_type_name + "())";
+                });
+                
+                GenerateFun(writer, 
+                            nested_method_name, 
+                            "obj: " + nested_type_name,
+                            nested_type_name + "?",
+                            [&](CodeWriter &code){
+                    OffsetWrapper(code, offset_val, "obj.assign(__indirect(__vector(o)), bb)", "null");
+                });
             }
             
             // Generate mutators for scalar fields or vectors of scalars.
@@ -1142,7 +1179,7 @@ public:
                 // Boolean parameters have to be explicitly converted to byte
                 // representation.
                 auto setter_parameter = underlying_type.base_type == BASE_TYPE_BOOL
-                        ? "(" + field.name + " ? 1 : 0).toByte()"
+                        ? "(if(" + field.name + ") 1 else 0).toByte()"
                         : field.name;
                 
                 auto setter_index = value_base_type == BASE_TYPE_VECTOR
@@ -1161,17 +1198,9 @@ public:
                         if (struct_def.fixed) {
                             code += "{{setter}}({{index}}, {{params}}{{cast}})";
                         } else {
-                            code += "val o = __offset({{offset}})";
-                            code += "return if (o != 0) {";
-                            code.IncrementIdentLevel();
-                            code += "{{setter}}({{index}}, {{params}}{{cast}})";
-                            code +="true";
-                            code.DecrementIdentLevel();
-                            code += "} else {";
-                            code.IncrementIdentLevel();
-                            code +="false";
-                            code.DecrementIdentLevel();
-                            code += "}";
+                            OffsetWrapper(code, offset_val, 
+                                          "{{setter}}({{index}}, {{params}}{{cast}})\ntrue",
+                                          "false");
                         }
                     };
                     
@@ -1185,7 +1214,7 @@ public:
                 }
             }
         }
-        if (struct_def.has_key) {
+        if (struct_def.has_key && !struct_def.fixed) {
             // Key Comparison method
             GenerateOverrideFun(
                         writer,
@@ -1211,10 +1240,22 @@ public:
     
     static std::string TypeConversor(std::string from_type, 
                                      std::string to_type) {
-        if (from_type == "Byte" && to_type == "Int") {
+        if (to_type == "Boolean") 
+            return ".toInt() != 0";
+
+        if (from_type == to_type)
+            return "";
+        
+        if (to_type == "Int") {
             return ".toInt()";
-        } else if (from_type == "Int" && to_type == "Long") {
+        } else if (to_type == "Short") {
+            return ".toShort()";
+        } else if (to_type == "Long") {
             return ".toLong()";
+        } else if (to_type == "Byte") {
+           return ".toByte()";
+        } else if (to_type == "Boolean") {
+            return ".toInt() != 0";
         }
         return "";
     }
@@ -1422,6 +1463,22 @@ public:
                 " else " + not_found;
     }
     
+    static void OffsetWrapper(CodeWriter &code, 
+                       std::string offset, 
+                       std::string found,
+                       std::string not_found) {
+        code += "val o = __offset(" + offset + ")";
+        code +="return if (o != 0) {";
+        code.IncrementIdentLevel();
+        code += found;
+        code.DecrementIdentLevel();
+        code += "} else {";
+        code.IncrementIdentLevel();
+        code += not_found;
+        code.DecrementIdentLevel();
+        code += "}";
+    }
+    
     static std::string Indirect(std::string index, bool fixed) {
         // We apply __indirect() and struct is not fixed.
         if (!fixed)
@@ -1429,6 +1486,10 @@ public:
         return index;
     }
     static std::string NotFoundReturn(BaseType el) {
+        if (el == BASE_TYPE_DOUBLE)
+            return "0.0";
+        if (el == BASE_TYPE_FLOAT)
+            return "0.0f";
         if (el == BASE_TYPE_BOOL)
             return "false";
         if (IsScalar(el))

@@ -3,28 +3,19 @@
 
 #ifndef FLATBUFFERS_GENERATED_NAMESPACETEST1_NAMESPACEA_NAMESPACEB_H_
 #define FLATBUFFERS_GENERATED_NAMESPACETEST1_NAMESPACEA_NAMESPACEB_H_
-
 #include "flatbuffers/flatbuffers.h"
-
 namespace NamespaceA {
 namespace NamespaceB {
-
 struct TableInNestedNS;
-
 struct StructInNestedNS;
-
 inline const flatbuffers::TypeTable *TableInNestedNSTypeTable();
-
 inline const flatbuffers::TypeTable *StructInNestedNSTypeTable();
-
 enum EnumInNestedNS {
   EnumInNestedNS_A = 0,
   EnumInNestedNS_B = 1,
   EnumInNestedNS_C = 2,
   EnumInNestedNS_MIN = EnumInNestedNS_A,
-  EnumInNestedNS_MAX = EnumInNestedNS_C
-};
-
+  EnumInNestedNS_MAX = EnumInNestedNS_C};
 inline const EnumInNestedNS (&EnumValuesEnumInNestedNS())[3] {
   static const EnumInNestedNS values[] = {
     EnumInNestedNS_A,
@@ -33,7 +24,6 @@ inline const EnumInNestedNS (&EnumValuesEnumInNestedNS())[3] {
   };
   return values;
 }
-
 inline const char * const *EnumNamesEnumInNestedNS() {
   static const char * const names[4] = {
     "A",
@@ -43,18 +33,15 @@ inline const char * const *EnumNamesEnumInNestedNS() {
   };
   return names;
 }
-
 inline const char *EnumNameEnumInNestedNS(EnumInNestedNS e) {
   if (e < EnumInNestedNS_A || e > EnumInNestedNS_C) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesEnumInNestedNS()[index];
 }
-
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) StructInNestedNS FLATBUFFERS_FINAL_CLASS {
  private:
   int32_t a_;
   int32_t b_;
-
  public:
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return StructInNestedNSTypeTable();
@@ -80,14 +67,12 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) StructInNestedNS FLATBUFFERS_FINAL_CLASS 
   }
 };
 FLATBUFFERS_STRUCT_END(StructInNestedNS, 8);
-
 struct TableInNestedNS FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return TableInNestedNSTypeTable();
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_FOO = 4
-  };
+    VT_FOO = 4  };
   int32_t foo() const {
     return GetField<int32_t>(VT_FOO, 0);
   }
@@ -100,7 +85,6 @@ struct TableInNestedNS FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.EndTable();
   }
 };
-
 struct TableInNestedNSBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
@@ -118,7 +102,6 @@ struct TableInNestedNSBuilder {
     return o;
   }
 };
-
 inline flatbuffers::Offset<TableInNestedNS> CreateTableInNestedNS(
     flatbuffers::FlatBufferBuilder &_fbb,
     int32_t foo = 0) {
@@ -126,7 +109,6 @@ inline flatbuffers::Offset<TableInNestedNS> CreateTableInNestedNS(
   builder_.add_foo(foo);
   return builder_.Finish();
 }
-
 inline const flatbuffers::TypeTable *EnumInNestedNSTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_CHAR, 0, 0 },
@@ -146,7 +128,6 @@ inline const flatbuffers::TypeTable *EnumInNestedNSTypeTable() {
   };
   return &tt;
 }
-
 inline const flatbuffers::TypeTable *TableInNestedNSTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_INT, 0, -1 }
@@ -159,7 +140,6 @@ inline const flatbuffers::TypeTable *TableInNestedNSTypeTable() {
   };
   return &tt;
 }
-
 inline const flatbuffers::TypeTable *StructInNestedNSTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_INT, 0, -1 },
@@ -175,8 +155,6 @@ inline const flatbuffers::TypeTable *StructInNestedNSTypeTable() {
   };
   return &tt;
 }
-
 }  // namespace NamespaceB
 }  // namespace NamespaceA
-
 #endif  // FLATBUFFERS_GENERATED_NAMESPACETEST1_NAMESPACEA_NAMESPACEB_H_

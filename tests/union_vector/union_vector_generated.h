@@ -3,19 +3,13 @@
 
 #ifndef FLATBUFFERS_GENERATED_UNIONVECTOR_H_
 #define FLATBUFFERS_GENERATED_UNIONVECTOR_H_
-
 #include "flatbuffers/flatbuffers.h"
-
 struct Attacker;
 struct AttackerT;
-
 struct Rapunzel;
-
 struct BookReader;
-
 struct Movie;
 struct MovieT;
-
 bool operator==(const AttackerT &lhs, const AttackerT &rhs);
 bool operator!=(const AttackerT &lhs, const AttackerT &rhs);
 bool operator==(const Rapunzel &lhs, const Rapunzel &rhs);
@@ -24,15 +18,10 @@ bool operator==(const BookReader &lhs, const BookReader &rhs);
 bool operator!=(const BookReader &lhs, const BookReader &rhs);
 bool operator==(const MovieT &lhs, const MovieT &rhs);
 bool operator!=(const MovieT &lhs, const MovieT &rhs);
-
 inline const flatbuffers::TypeTable *AttackerTypeTable();
-
 inline const flatbuffers::TypeTable *RapunzelTypeTable();
-
 inline const flatbuffers::TypeTable *BookReaderTypeTable();
-
 inline const flatbuffers::TypeTable *MovieTypeTable();
-
 enum Character {
   Character_NONE = 0,
   Character_MuLan = 1,
@@ -42,9 +31,7 @@ enum Character {
   Character_Other = 5,
   Character_Unused = 6,
   Character_MIN = Character_NONE,
-  Character_MAX = Character_Unused
-};
-
+  Character_MAX = Character_Unused};
 inline const Character (&EnumValuesCharacter())[7] {
   static const Character values[] = {
     Character_NONE,
@@ -57,7 +44,6 @@ inline const Character (&EnumValuesCharacter())[7] {
   };
   return values;
 }
-
 inline const char * const *EnumNamesCharacter() {
   static const char * const names[8] = {
     "NONE",
@@ -71,17 +57,14 @@ inline const char * const *EnumNamesCharacter() {
   };
   return names;
 }
-
 inline const char *EnumNameCharacter(Character e) {
   if (e < Character_NONE || e > Character_Unused) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesCharacter()[index];
 }
-
 struct CharacterUnion {
   Character type;
   void *value;
-
   CharacterUnion() : type(Character_NONE), value(nullptr) {}
   CharacterUnion(CharacterUnion&& u) FLATBUFFERS_NOEXCEPT :
     type(Character_NONE), value(nullptr)
@@ -92,12 +75,9 @@ struct CharacterUnion {
   CharacterUnion &operator=(CharacterUnion &&u) FLATBUFFERS_NOEXCEPT
     { std::swap(type, u.type); std::swap(value, u.value); return *this; }
   ~CharacterUnion() { Reset(); }
-
   void Reset();
-
   static void *UnPack(const void *obj, Character type, const flatbuffers::resolver_function_t *resolver);
   flatbuffers::Offset<void> Pack(flatbuffers::FlatBufferBuilder &_fbb, const flatbuffers::rehasher_function_t *_rehasher = nullptr) const;
-
   AttackerT *AsMuLan() {
     return type == Character_MuLan ?
       reinterpret_cast<AttackerT *>(value) : nullptr;
@@ -147,8 +127,6 @@ struct CharacterUnion {
       reinterpret_cast<const std::string *>(value) : nullptr;
   }
 };
-
-
 inline bool operator==(const CharacterUnion &lhs, const CharacterUnion &rhs) {
   if (lhs.type != rhs.type) return false;
   switch (lhs.type) {
@@ -184,18 +162,14 @@ inline bool operator==(const CharacterUnion &lhs, const CharacterUnion &rhs) {
     }
   }
 }
-
 inline bool operator!=(const CharacterUnion &lhs, const CharacterUnion &rhs) {
     return !(lhs == rhs);
 }
-
 bool VerifyCharacter(flatbuffers::Verifier &verifier, const void *obj, Character type);
 bool VerifyCharacterVector(flatbuffers::Verifier &verifier, const flatbuffers::Vector<flatbuffers::Offset<void>> *values, const flatbuffers::Vector<uint8_t> *types);
-
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Rapunzel FLATBUFFERS_FINAL_CLASS {
  private:
   int32_t hair_length_;
-
  public:
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return RapunzelTypeTable();
@@ -214,21 +188,16 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Rapunzel FLATBUFFERS_FINAL_CLASS {
   }
 };
 FLATBUFFERS_STRUCT_END(Rapunzel, 4);
-
 inline bool operator==(const Rapunzel &lhs, const Rapunzel &rhs) {
   return
       (lhs.hair_length() == rhs.hair_length());
 }
-
 inline bool operator!=(const Rapunzel &lhs, const Rapunzel &rhs) {
     return !(lhs == rhs);
 }
-
-
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) BookReader FLATBUFFERS_FINAL_CLASS {
  private:
   int32_t books_read_;
-
  public:
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return BookReaderTypeTable();
@@ -247,17 +216,13 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) BookReader FLATBUFFERS_FINAL_CLASS {
   }
 };
 FLATBUFFERS_STRUCT_END(BookReader, 4);
-
 inline bool operator==(const BookReader &lhs, const BookReader &rhs) {
   return
       (lhs.books_read() == rhs.books_read());
 }
-
 inline bool operator!=(const BookReader &lhs, const BookReader &rhs) {
     return !(lhs == rhs);
 }
-
-
 struct AttackerT : public flatbuffers::NativeTable {
   typedef Attacker TableType;
   int32_t sword_attack_damage;
@@ -265,25 +230,20 @@ struct AttackerT : public flatbuffers::NativeTable {
       : sword_attack_damage(0) {
   }
 };
-
 inline bool operator==(const AttackerT &lhs, const AttackerT &rhs) {
   return
       (lhs.sword_attack_damage == rhs.sword_attack_damage);
 }
-
 inline bool operator!=(const AttackerT &lhs, const AttackerT &rhs) {
     return !(lhs == rhs);
 }
-
-
 struct Attacker FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef AttackerT NativeTableType;
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return AttackerTypeTable();
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_SWORD_ATTACK_DAMAGE = 4
-  };
+    VT_SWORD_ATTACK_DAMAGE = 4  };
   int32_t sword_attack_damage() const {
     return GetField<int32_t>(VT_SWORD_ATTACK_DAMAGE, 0);
   }
@@ -299,7 +259,6 @@ struct Attacker FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   void UnPackTo(AttackerT *_o, const flatbuffers::resolver_function_t *_resolver = nullptr) const;
   static flatbuffers::Offset<Attacker> Pack(flatbuffers::FlatBufferBuilder &_fbb, const AttackerT* _o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
 };
-
 struct AttackerBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
@@ -317,7 +276,6 @@ struct AttackerBuilder {
     return o;
   }
 };
-
 inline flatbuffers::Offset<Attacker> CreateAttacker(
     flatbuffers::FlatBufferBuilder &_fbb,
     int32_t sword_attack_damage = 0) {
@@ -325,9 +283,7 @@ inline flatbuffers::Offset<Attacker> CreateAttacker(
   builder_.add_sword_attack_damage(sword_attack_damage);
   return builder_.Finish();
 }
-
 flatbuffers::Offset<Attacker> CreateAttacker(flatbuffers::FlatBufferBuilder &_fbb, const AttackerT *_o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
-
 struct MovieT : public flatbuffers::NativeTable {
   typedef Movie TableType;
   CharacterUnion main_character;
@@ -335,18 +291,14 @@ struct MovieT : public flatbuffers::NativeTable {
   MovieT() {
   }
 };
-
 inline bool operator==(const MovieT &lhs, const MovieT &rhs) {
   return
       (lhs.main_character == rhs.main_character) &&
       (lhs.characters == rhs.characters);
 }
-
 inline bool operator!=(const MovieT &lhs, const MovieT &rhs) {
     return !(lhs == rhs);
 }
-
-
 struct Movie FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef MovieT NativeTableType;
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
@@ -356,8 +308,7 @@ struct Movie FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_MAIN_CHARACTER_TYPE = 4,
     VT_MAIN_CHARACTER = 6,
     VT_CHARACTERS_TYPE = 8,
-    VT_CHARACTERS = 10
-  };
+    VT_CHARACTERS = 10  };
   Character main_character_type() const {
     return static_cast<Character>(GetField<uint8_t>(VT_MAIN_CHARACTER_TYPE, 0));
   }
@@ -416,7 +367,6 @@ struct Movie FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   void UnPackTo(MovieT *_o, const flatbuffers::resolver_function_t *_resolver = nullptr) const;
   static flatbuffers::Offset<Movie> Pack(flatbuffers::FlatBufferBuilder &_fbb, const MovieT* _o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
 };
-
 struct MovieBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
@@ -443,7 +393,6 @@ struct MovieBuilder {
     return o;
   }
 };
-
 inline flatbuffers::Offset<Movie> CreateMovie(
     flatbuffers::FlatBufferBuilder &_fbb,
     Character main_character_type = Character_NONE,
@@ -457,7 +406,6 @@ inline flatbuffers::Offset<Movie> CreateMovie(
   builder_.add_main_character_type(main_character_type);
   return builder_.Finish();
 }
-
 inline flatbuffers::Offset<Movie> CreateMovieDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     Character main_character_type = Character_NONE,
@@ -473,25 +421,20 @@ inline flatbuffers::Offset<Movie> CreateMovieDirect(
       characters_type__,
       characters__);
 }
-
 flatbuffers::Offset<Movie> CreateMovie(flatbuffers::FlatBufferBuilder &_fbb, const MovieT *_o, const flatbuffers::rehasher_function_t *_rehasher = nullptr);
-
 inline AttackerT *Attacker::UnPack(const flatbuffers::resolver_function_t *_resolver) const {
   auto _o = new AttackerT();
   UnPackTo(_o, _resolver);
   return _o;
 }
-
 inline void Attacker::UnPackTo(AttackerT *_o, const flatbuffers::resolver_function_t *_resolver) const {
   (void)_o;
   (void)_resolver;
   { auto _e = sword_attack_damage(); _o->sword_attack_damage = _e; };
 }
-
 inline flatbuffers::Offset<Attacker> Attacker::Pack(flatbuffers::FlatBufferBuilder &_fbb, const AttackerT* _o, const flatbuffers::rehasher_function_t *_rehasher) {
   return CreateAttacker(_fbb, _o, _rehasher);
 }
-
 inline flatbuffers::Offset<Attacker> CreateAttacker(flatbuffers::FlatBufferBuilder &_fbb, const AttackerT *_o, const flatbuffers::rehasher_function_t *_rehasher) {
   (void)_rehasher;
   (void)_o;
@@ -501,13 +444,11 @@ inline flatbuffers::Offset<Attacker> CreateAttacker(flatbuffers::FlatBufferBuild
       _fbb,
       _sword_attack_damage);
 }
-
 inline MovieT *Movie::UnPack(const flatbuffers::resolver_function_t *_resolver) const {
   auto _o = new MovieT();
   UnPackTo(_o, _resolver);
   return _o;
 }
-
 inline void Movie::UnPackTo(MovieT *_o, const flatbuffers::resolver_function_t *_resolver) const {
   (void)_o;
   (void)_resolver;
@@ -516,11 +457,9 @@ inline void Movie::UnPackTo(MovieT *_o, const flatbuffers::resolver_function_t *
   { auto _e = characters_type(); if (_e) { _o->characters.resize(_e->size()); for (flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { _o->characters[_i].type = static_cast<Character>(_e->Get(_i)); } } };
   { auto _e = characters(); if (_e) { _o->characters.resize(_e->size()); for (flatbuffers::uoffset_t _i = 0; _i < _e->size(); _i++) { _o->characters[_i].value = CharacterUnion::UnPack(_e->Get(_i), characters_type()->GetEnum<Character>(_i), _resolver); } } };
 }
-
 inline flatbuffers::Offset<Movie> Movie::Pack(flatbuffers::FlatBufferBuilder &_fbb, const MovieT* _o, const flatbuffers::rehasher_function_t *_rehasher) {
   return CreateMovie(_fbb, _o, _rehasher);
 }
-
 inline flatbuffers::Offset<Movie> CreateMovie(flatbuffers::FlatBufferBuilder &_fbb, const MovieT *_o, const flatbuffers::rehasher_function_t *_rehasher) {
   (void)_rehasher;
   (void)_o;
@@ -536,7 +475,6 @@ inline flatbuffers::Offset<Movie> CreateMovie(flatbuffers::FlatBufferBuilder &_f
       _characters_type,
       _characters);
 }
-
 inline bool VerifyCharacter(flatbuffers::Verifier &verifier, const void *obj, Character type) {
   switch (type) {
     case Character_NONE: {
@@ -566,7 +504,6 @@ inline bool VerifyCharacter(flatbuffers::Verifier &verifier, const void *obj, Ch
     default: return false;
   }
 }
-
 inline bool VerifyCharacterVector(flatbuffers::Verifier &verifier, const flatbuffers::Vector<flatbuffers::Offset<void>> *values, const flatbuffers::Vector<uint8_t> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
@@ -578,7 +515,6 @@ inline bool VerifyCharacterVector(flatbuffers::Verifier &verifier, const flatbuf
   }
   return true;
 }
-
 inline void *CharacterUnion::UnPack(const void *obj, Character type, const flatbuffers::resolver_function_t *resolver) {
   switch (type) {
     case Character_MuLan: {
@@ -608,7 +544,6 @@ inline void *CharacterUnion::UnPack(const void *obj, Character type, const flatb
     default: return nullptr;
   }
 }
-
 inline flatbuffers::Offset<void> CharacterUnion::Pack(flatbuffers::FlatBufferBuilder &_fbb, const flatbuffers::rehasher_function_t *_rehasher) const {
   switch (type) {
     case Character_MuLan: {
@@ -638,7 +573,6 @@ inline flatbuffers::Offset<void> CharacterUnion::Pack(flatbuffers::FlatBufferBui
     default: return 0;
   }
 }
-
 inline CharacterUnion::CharacterUnion(const CharacterUnion &u) FLATBUFFERS_NOEXCEPT : type(u.type), value(nullptr) {
   switch (type) {
     case Character_MuLan: {
@@ -669,7 +603,6 @@ inline CharacterUnion::CharacterUnion(const CharacterUnion &u) FLATBUFFERS_NOEXC
       break;
   }
 }
-
 inline void CharacterUnion::Reset() {
   switch (type) {
     case Character_MuLan: {
@@ -707,7 +640,6 @@ inline void CharacterUnion::Reset() {
   value = nullptr;
   type = Character_NONE;
 }
-
 inline const flatbuffers::TypeTable *CharacterTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_SEQUENCE, 0, -1 },
@@ -737,7 +669,6 @@ inline const flatbuffers::TypeTable *CharacterTypeTable() {
   };
   return &tt;
 }
-
 inline const flatbuffers::TypeTable *AttackerTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_INT, 0, -1 }
@@ -750,7 +681,6 @@ inline const flatbuffers::TypeTable *AttackerTypeTable() {
   };
   return &tt;
 }
-
 inline const flatbuffers::TypeTable *RapunzelTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_INT, 0, -1 }
@@ -764,7 +694,6 @@ inline const flatbuffers::TypeTable *RapunzelTypeTable() {
   };
   return &tt;
 }
-
 inline const flatbuffers::TypeTable *BookReaderTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_INT, 0, -1 }
@@ -778,7 +707,6 @@ inline const flatbuffers::TypeTable *BookReaderTypeTable() {
   };
   return &tt;
 }
-
 inline const flatbuffers::TypeTable *MovieTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_UTYPE, 0, 0 },
@@ -800,60 +728,48 @@ inline const flatbuffers::TypeTable *MovieTypeTable() {
   };
   return &tt;
 }
-
 inline const Movie *GetMovie(const void *buf) {
   return flatbuffers::GetRoot<Movie>(buf);
 }
-
 inline const Movie *GetSizePrefixedMovie(const void *buf) {
   return flatbuffers::GetSizePrefixedRoot<Movie>(buf);
 }
-
 inline Movie *GetMutableMovie(void *buf) {
   return flatbuffers::GetMutableRoot<Movie>(buf);
 }
-
 inline const char *MovieIdentifier() {
   return "MOVI";
 }
-
 inline bool MovieBufferHasIdentifier(const void *buf) {
   return flatbuffers::BufferHasIdentifier(
       buf, MovieIdentifier());
 }
-
 inline bool VerifyMovieBuffer(
     flatbuffers::Verifier &verifier) {
   return verifier.VerifyBuffer<Movie>(MovieIdentifier());
 }
-
 inline bool VerifySizePrefixedMovieBuffer(
     flatbuffers::Verifier &verifier) {
   return verifier.VerifySizePrefixedBuffer<Movie>(MovieIdentifier());
 }
-
 inline void FinishMovieBuffer(
     flatbuffers::FlatBufferBuilder &fbb,
     flatbuffers::Offset<Movie> root) {
   fbb.Finish(root, MovieIdentifier());
 }
-
 inline void FinishSizePrefixedMovieBuffer(
     flatbuffers::FlatBufferBuilder &fbb,
     flatbuffers::Offset<Movie> root) {
   fbb.FinishSizePrefixed(root, MovieIdentifier());
 }
-
 inline flatbuffers::unique_ptr<MovieT> UnPackMovie(
     const void *buf,
     const flatbuffers::resolver_function_t *res = nullptr) {
   return flatbuffers::unique_ptr<MovieT>(GetMovie(buf)->UnPack(res));
 }
-
 inline flatbuffers::unique_ptr<MovieT> UnPackSizePrefixedMovie(
     const void *buf,
     const flatbuffers::resolver_function_t *res = nullptr) {
   return flatbuffers::unique_ptr<MovieT>(GetSizePrefixedMovie(buf)->UnPack(res));
 }
-
 #endif  // FLATBUFFERS_GENERATED_UNIONVECTOR_H_

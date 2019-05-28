@@ -17,20 +17,24 @@
 echo Compile then run the Kotlin test.
 
 testdir=$(dirname $0)
-thisdir=$(pwd)
+targetdir="${testdir}/target"
 
-if [[ "$testdir" != "$thisdir" ]]; then
-	echo error: must be run from inside the ${testdir} directory
-	echo you ran it from ${thisdir}
-	exit 1
+if [[ -e "${targetdir}" ]]; then
+    echo "cleaning target"
+    rm -rf "${targetdir}"
 fi
 
-kotlinc KotlinTest.kt ${testdir}/../kotlin/* ${testdir}/MyGame/Example/*.kt -include-runtime -d KotlinTest.jar 
-if [ $? -ne 0 ]; then
-    echo "Failed Kotlin compilation, look into logs.txt for error output"
+mkdir -v "${targetdir}"
+
+if ! find "${testdir}/../java" -type f -name "*.class" -delete; then
+    echo "failed to clean .class files from java directory" >&2
     exit 1
 fi
-java -jar KotlinTest.jar
-if [ $? -ne 0 ]; then
-    echo "Failed Test compilation or failed tests"
-fi
+
+#kotlinc -classpath "${testdir}/../java:${testdir}" ${testdir}/namespace_test/*.kt ${testdir}/union_vector*.kt KotlinTest.kt ${testdir}/MyGame/Example/*.kt -include-runtime -d "${targetdir}"
+kotlinc ${testdir}/../java/com/google/flatbuffers/*.java  KotlinTest.kt -classpath "${testdir}/MyGame" ${testdir}/MyGame/*.kt ${testdir}/MyGame/Example/*.kt -include-runtime -d "${targetdir}"
+
+(cd "${testdir}" && kotlin  -classpath "${targetdir}" KotlinTestKt )
+
+rm -rf "${targetdir}"
+
