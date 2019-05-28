@@ -30,9 +30,11 @@ namespace flatbuffers {
 
 void CodeWriter::operator+=(std::string text) {
     
-  if (!ignore_ident_) {
+  if (text.empty())
+      return;
+  if (!ignore_ident_)
     AppendIdent(stream_);    
-  }
+  
   while (true) {
     auto begin = text.find("{{");
     if (begin == std::string::npos) { break; }
