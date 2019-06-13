@@ -1,5 +1,6 @@
 #!/bin/sh
 
+set -x 
 # Copyright 2014 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,10 +32,15 @@ if ! find "${testdir}/../java" -type f -name "*.class" -delete; then
     exit 1
 fi
 
-#kotlinc -classpath "${testdir}/../java:${testdir}" ${testdir}/namespace_test/*.kt ${testdir}/union_vector*.kt KotlinTest.kt ${testdir}/MyGame/Example/*.kt -include-runtime -d "${targetdir}"
-kotlinc ${testdir}/../java/com/google/flatbuffers/*.java  KotlinTest.kt -classpath "${testdir}/MyGame" ${testdir}/MyGame/*.kt ${testdir}/MyGame/Example/*.kt -include-runtime -d "${targetdir}"
+namespace_files=`find ./namespace_test -name "*.kt" -print`
+union_files=`find ./union_vector -name "*.kt" -print`
+all_kt_files=`find . -name "*.kt" -print`
+javac ${testdir}/../java/com/google/flatbuffers/*.java -d kotlin
+kotlinc KotlinTest.kt  $namespace_files $union_files ${testdir}/MyGame/*.kt ${testdir}/MyGame/Example/*.kt -classpath "${testdir}/kotlin" -include-runtime -d kotlin
+#kotlinc KotlinTest.kt -classpath "${testdir}/kotlin" -include-runtime -d kotlin_test.jar
+#kotlin  -classpath "${testdir}/kotlin:${testdir}/kotlin/com/google/flatbuffers/*" kotlin_test.jar
 
-(cd "${testdir}" && kotlin  -classpath "${targetdir}" KotlinTestKt )
-
-rm -rf "${targetdir}"
+jar cvf kotlin_test.jar -C kotlin .
+kotlin -cp kotlin_test.jar KotlinTest
+#rm -rf kotlinTest.jar
 
