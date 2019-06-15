@@ -103,8 +103,8 @@ class KotlinTest {
         TestEq(monster.name, "MyMonster")
         // monster.friendly() // can't access, deprecated
 
-        val pos = monster.pos
-        TestEq(pos!!.x, 1.0f)
+        val pos = monster.pos!!
+        TestEq(pos.x, 1.0f)
         TestEq(pos.y, 2.0f)
         TestEq(pos.z, 3.0f)
         TestEq(pos.test1, 3.0)
@@ -131,6 +131,7 @@ class KotlinTest {
         while (ibb.position() < ibb.limit())
             invsum += ibb.get().toInt()
         TestEq(invsum, 10)
+
 
         val test_0 = monster.test4(0)!!
         val test_1 = monster.test4(1)!!
@@ -459,7 +460,7 @@ class KotlinTest {
 
         TestEq(movie.charactersType(0), characterTypeVector[0])
 
-        //TestEq((movie.characters(Attacker(), 0) as Attacker).swordAttackDamage(), swordAttackDamage)
+        TestEq((movie.characters(Attacker(), 0) as Attacker).swordAttackDamage, swordAttackDamage)
     }
 
     fun <T>TestEq(a: T, b: T) {

@@ -599,7 +599,7 @@ public:
             });
 
             // Generate assign method
-            GenerateFun(writer, "assign", "_i: Int, _bb: ByteBuffer",
+            GenerateFun(writer, "__assign", "_i: Int, _bb: ByteBuffer",
                         Esc(struct_def.name),
                         [&](CodeWriter &code) {
                 code += "init(_i, _bb)";
@@ -713,7 +713,7 @@ public:
             code += "}"; // end comp < 0
             code += "else -> {";
             code.IncrementIdentLevel();
-            code += "return (obj ?: {{struct_name}}()).assign(tableOffset, bb)";
+            code += "return (obj ?: {{struct_name}}()).__assign(tableOffset, bb)";
             code.DecrementIdentLevel();
             code += "}"; // end else
             code.DecrementIdentLevel();
@@ -1012,12 +1012,12 @@ public:
                     if (struct_def.fixed) {
                         // create getter with object reuse
                         // e.g.
-                        //  fun pos(obj: Vec3) : Vec3? = obj.assign(bb_pos + 4, bb)
+                        //  fun pos(obj: Vec3) : Vec3? = obj.__assign(bb_pos + 4, bb)
                         // ? adds nullability annotation
                         GenerateFunOneLine(writer, field_name, "obj: " + field_type ,
                                     return_type + "?",
                                     [&](CodeWriter &writer){
-                            writer += "obj.assign(bb_pos + {{offset}}, bb)";
+                            writer += "obj.__assign(bb_pos + {{offset}}, bb)";
                         });
                     } else {
                         // create getter with object reuse
@@ -1025,7 +1025,7 @@ public:
                         //  fun pos(obj: Vec3) : Vec3? {
                         //      val o = __offset(4)
                         //      return if(o != 0) {
-                        //          obj.assign(o + bb_pos, bb)
+                        //          obj.__assign(o + bb_pos, bb)
                         //      else {
                         //          null
                         //      }
@@ -1038,7 +1038,7 @@ public:
                             writer.SetValue("seek", Indirect("o + bb_pos", fixed));
                             OffsetWrapper(writer,
                                           offset_val,
-                                          "obj.assign({{seek}}, bb)",
+                                          "obj.__assign({{seek}}, bb)",
                                           "null");
                         });
                     }
@@ -1083,15 +1083,16 @@ public:
                                 [&](CodeWriter &writer){
                         auto inline_size = NumToString(InlineSize(vectortype));
                         auto index = "__vector(o) + j * " + inline_size;
-                        bool fixed = struct_def.fixed;
                         auto not_found = NotFoundReturn(field.value.type.element);
                         auto found = "";
                         writer.SetValue("index", index);
                         switch(vectortype.base_type) {
-                        case BASE_TYPE_STRUCT:
+                        case BASE_TYPE_STRUCT: {
+                            bool fixed = vectortype.struct_def->fixed;
                             writer.SetValue("index", Indirect(index, fixed));
-                            found = "obj.assign({{index}}, bb){{cast}}{{field_mask}}";
+                            found = "obj.__assign({{index}}, bb){{cast}}{{field_mask}}";
                             break;
+                        }
                         case BASE_TYPE_UNION:
                             found = "{{field_read_func}}(obj, {{index}} - bb_pos){{cast}}{{field_mask}}";
                             break;
@@ -1203,7 +1204,7 @@ public:
                 auto nested_type_name = WrapInNameSpace(*field.nested_flatbuffer);
                 auto nested_method_name =
                         field_name + "As" +
-                        nested_type_name;
+                        field.nested_flatbuffer->name;
 
                 GenerateGetterOneLine(writer,
                                       nested_method_name,
@@ -1217,7 +1218,7 @@ public:
                             "obj: " + nested_type_name,
                             nested_type_name + "?",
                             [&](CodeWriter &code){
-                    OffsetWrapper(code, offset_val, "obj.assign(__indirect(__vector(o)), bb)", "null");
+                    OffsetWrapper(code, offset_val, "obj.__assign(__indirect(__vector(o)), bb)", "null");
                 });
             }
 
@@ -1349,7 +1350,7 @@ public:
                  "(_bb: ByteBuffer, obj: {{gr_name}}): {{gr_name}} {";
         code.IncrementIdentLevel();
         code += "_bb.order(ByteOrder.LITTLE_ENDIAN)";
-        code += "return (obj.assign(_bb.getInt(_bb.position())"
+        code += "return (obj.__assign(_bb.getInt(_bb.position())"
                  " + _bb.position(), _bb))";
         code.DecrementIdentLevel();
         code += "}";
