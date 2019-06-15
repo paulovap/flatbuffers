@@ -35,12 +35,16 @@ fi
 namespace_files=`find ./namespace_test -name "*.kt" -print`
 union_files=`find ./union_vector -name "*.kt" -print`
 all_kt_files=`find . -name "*.kt" -print`
-javac ${testdir}/../java/com/google/flatbuffers/*.java -d kotlin
-kotlinc KotlinTest.kt  $namespace_files $union_files ${testdir}/MyGame/*.kt ${testdir}/MyGame/Example/*.kt -classpath "${testdir}/kotlin" -include-runtime -d kotlin
-#kotlinc KotlinTest.kt -classpath "${testdir}/kotlin" -include-runtime -d kotlin_test.jar
-#kotlin  -classpath "${testdir}/kotlin:${testdir}/kotlin/com/google/flatbuffers/*" kotlin_test.jar
 
+mkdir kotlin
+# Compile java FlatBuffer library 
+javac ${testdir}/../java/com/google/flatbuffers/*.java -d kotlin
+# Compile Kotlin files
+kotlinc KotlinTest.kt  $namespace_files $union_files ${testdir}/MyGame/*.kt ${testdir}/MyGame/Example/*.kt -classpath "${testdir}/kotlin" -include-runtime -d kotlin
+# Make jar
 jar cvf kotlin_test.jar -C kotlin .
+# Run test
 kotlin -cp kotlin_test.jar KotlinTest
-#rm -rf kotlinTest.jar
+# clean up
+rm -rf ${testdir}/kotlin
 

@@ -28,7 +28,7 @@
 
 namespace flatbuffers {
 
-using CodeblockFunction = std::function<void(CodeWriter &)>;
+using Codeblock = std::function<void(CodeWriter &)>;
 
 static TypedFloatConstantGenerator KotlinFloatGen("Double.", "Float.", "NaN",
                                                 "POSITIVE_INFINITY",
@@ -37,7 +37,7 @@ static TypedFloatConstantGenerator KotlinFloatGen("Double.", "Float.", "NaN",
 static const CommentConfig comment_config= { "/**", " *", " */" };
 
 static std::map<std::string, std::pair<std::string, std::string> >
-fb_builder_add_table_param_map = {
+fbb_param_map = {
     {"Boolean", {"Boolean", "Boolean"}},
     //"" actually means "Byte"
     {"",    {"Byte", "Int"}},
@@ -101,14 +101,13 @@ public:
     CodeWriter code_;
 
     KotlinGenerator &operator=(const KotlinGenerator &);
-    bool generate() {
+    bool generate() override {
         std::string one_file_code;
         cur_name_space_ = parser_.current_namespace_;
 
-        for (auto it = parser_.enums_.vec.begin(); it != parser_.enums_.vec.end();
-             ++it) {
+        for (auto it : parser_.enums_.vec) {
             std::string enumcode;
-            auto &enum_def = **it;
+            auto &enum_def = *it;
             if (!parser_.opts.one_file) cur_name_space_ = enum_def.defined_namespace;
             GenEnum(enum_def, &enumcode);
             if (parser_.opts.one_file) {
@@ -120,10 +119,9 @@ public:
             }
         }
 
-        for (auto it = parser_.structs_.vec.begin();
-             it != parser_.structs_.vec.end(); ++it) {
+        for (auto it : parser_.structs_.vec) {
             std::string declcode;
-            auto &struct_def = **it;
+            auto &struct_def = *it;
             if (!parser_.opts.one_file)
                 cur_name_space_ = struct_def.defined_namespace;
             GenStruct(struct_def, &declcode);
@@ -166,7 +164,7 @@ public:
         return SaveFile(filename.c_str(), code, false);
     }
 
-    const Namespace *CurrentNameSpace() const { return cur_name_space_; }
+    const Namespace *CurrentNameSpace() const override { return cur_name_space_; }
 
     static bool IsEnum(const Type &type) {
         return type.enum_def != nullptr && IsInteger(type.base_type);
@@ -199,12 +197,13 @@ public:
     }
 
     std::string GenTypeGet(const Type &type) const {
-        return IsScalar(type.base_type) ? GenTypeBasic(type) : GenTypePointer(type);
+        return IsScalar(type.base_type) ? GenTypeBasic(type) 
+                                        : GenTypePointer(type);
     }
 
     // Find the destination type the user wants to receive the value in (e.g.
     // one size higher signed types for unsigned serialized values in Java).
-    static Type DestinationType(const Type &type, bool vectorelem) {
+    static Type DestinationType(const Type &type, bool vec_elem) {
         switch (type.base_type) {
         // We use int for both uchar/ushort, since that generally means less
         // casting than using short for uchar.
@@ -215,7 +214,7 @@ public:
         case BASE_TYPE_UINT:
             return Type(BASE_TYPE_LONG);
         case BASE_TYPE_VECTOR:
-            if (vectorelem) return DestinationType(type.VectorType(), vectorelem);
+            if (vec_elem) return DestinationType(type.VectorType(), vec_elem);
             FLATBUFFERS_FALLTHROUGH();  // else fall thru
         default:
             return type;
@@ -228,7 +227,7 @@ public:
     }
 
     // Mask to turn serialized value into destination type value.
-    std::string DestinationMask(const Type &type, bool vectorelem) const {
+    std::string DestinationMask(const Type &type, bool vec_elem) const {
         switch (type.base_type) {
         case BASE_TYPE_UCHAR:
             return ".and(0xFF)";
@@ -237,7 +236,7 @@ public:
         case BASE_TYPE_UINT:
             return ".and(0xFFFFFFFFL)";
         case BASE_TYPE_VECTOR:
-            if (vectorelem) return DestinationMask(type.VectorType(), vectorelem);
+            if (vec_elem) return DestinationMask(type.VectorType(), vec_elem);
             FLATBUFFERS_FALLTHROUGH();  // else fall thru
         default:
             return "";
@@ -248,7 +247,8 @@ public:
     std::string DestinationCast(const Type &type) const {
         if (type.base_type == BASE_TYPE_VECTOR) {
             return DestinationCast(type.VectorType());
-        } else if (type.base_type == BASE_TYPE_UINT){
+        }
+        if (type.base_type == BASE_TYPE_UINT) {
             return ".toLong()";
         }
         return "";
@@ -261,15 +261,14 @@ public:
     static std::string SourceCast(const Type &type, bool castFromDest) {
         if (type.base_type == BASE_TYPE_VECTOR) {
             return SourceCast(type.VectorType(), castFromDest);
-        } else {
-            if (castFromDest) {
-                if (type.base_type == BASE_TYPE_UINT)
-                    return ".toInt()";
-                else if (type.base_type == BASE_TYPE_USHORT)
-                    return ".toShort()";
-                else if (type.base_type == BASE_TYPE_UCHAR)
-                    return ".toByte()";
-            }
+        } 
+        if (castFromDest) {
+            if (type.base_type == BASE_TYPE_UINT)
+                return ".toInt()";
+            if (type.base_type == BASE_TYPE_USHORT)
+                return ".toShort()";
+            if (type.base_type == BASE_TYPE_UCHAR)
+                return ".toByte()";
         }
         return "";
     }
@@ -295,8 +294,7 @@ public:
                         : value.constant;
     }
 
-    std::string GenDefaultValue(const FieldDef &field,
-                                bool enableLangOverrides) const {
+    std::string GenDefaultValue(const FieldDef &field) const {
         auto &value = field.value;
 
         auto longSuffix = "L";
@@ -325,33 +323,20 @@ public:
         }
     }
 
-    std::string GenDefaultValue(const FieldDef &field) const {
-        return GenDefaultValue(field, true);
-    }
-
-    std::string GenDefaultValueBasic(const FieldDef &field,
-                                     bool enableLangOverrides) const {
+    std::string GenDefaultValueBasic(const FieldDef &field) const {
         auto &value = field.value;
         if (!IsScalar(value.type.base_type)) {
             return "0";
         }
-        return GenDefaultValue(field, enableLangOverrides);
-    }
-
-    std::string GenDefaultValueBasic(const FieldDef &field) const {
-        return GenDefaultValueBasic(field, true);
+        return GenDefaultValue(field);
     }
 
     void GenEnum(EnumDef &enum_def, std::string *code_ptr) const {
         std::string &code = *code_ptr;
         if (enum_def.generated) return;
 
-        // Generate enum definitions of the form:
-        // public static (final) int name = value;
-        // In Java, we use ints rather than the Enum feature, because we want them
-        // to map directly to how they're used in C/C++ and file formats.
-        // That, and Java Enums are expensive, and not universally liked.
         GenComment(enum_def.doc_comment, code_ptr, &comment_config);
+        
         CodeWriter writer;
         writer += "@Suppress(\"unused\")";
         writer += "class " + Esc(enum_def.name) + " private constructor() {";
@@ -360,8 +345,8 @@ public:
         GenerateCompanionObject(writer, [&](CodeWriter &code){
             // Write all properties
             auto vals = enum_def.Vals();
-            for (auto it = vals.begin(); it != vals.end(); ++it) {
-                auto &ev = **it;
+            for (auto it : vals) {
+                auto &ev = *it;
                 code.SetValue("name", Esc(ev.name));
                 code.SetValue("type", GenTypeBasic(enum_def.underlying_type));
                 code.SetValue("val", enum_def.ToString(ev));
@@ -370,9 +355,9 @@ public:
             }
 
             // Generate a generate string table for enum values.
-            // Problem is, if values are very sparse that could generate really big
-            // tables. Ideally in that case we generate a map lookup instead, but for
-            // the moment we simply don't output a table at all.
+            // Problem is, if values are very sparse that could generate really
+            // big tables. Ideally in that case we generate a map lookup
+            // instead, but for the moment we simply don't output a table at all.
             auto range = enum_def.Distance();
             // Average distance between values above which we consider a table
             // "too sparse". Change at will.
@@ -386,7 +371,7 @@ public:
                     for (auto it = vals.begin(); it != vals.end(); ++it) {
                         auto ev = *it;
                         for (auto k = enum_def.Distance(val, ev); k > 1; --k)
-                            code += "\"\", \\";
+                            code += R"("", \)";
                         val = ev;
                         code += "\"" + (*it)->name + "\"\\";
                         if (it+1 != vals.end()) {
@@ -432,7 +417,7 @@ public:
     }
 
     // Returns the function name that is able to read a value of the given type.
-    std::string GenGetterForLookupByKey(flatbuffers::FieldDef *key_field,
+    std::string GenLookupByKey(flatbuffers::FieldDef *key_field,
                                         const std::string &data_buffer,
                                         const char *num = nullptr) const {
         auto type = key_field->value.type;
@@ -442,8 +427,8 @@ public:
         if (GenTypeBasic(type) != "Byte") {
             getter += MakeCamel(GenTypeBasic(type));
         }
-        getter = getter + "(" + GenOffsetGetter(key_field, num) + ")" + dest_cast +
-                dest_mask;
+        getter = getter + "(" + GenOffsetGetter(key_field, num) + ")" + 
+                dest_cast + dest_mask;
         return getter;
     }
 
@@ -457,9 +442,8 @@ public:
                 setter += MakeCamel(GenTypeBasic(type));
             }
             return setter;
-        } else {
-            return "";
         }
+        return "";
     }
 
     // Returns the method name for use with add/put calls.
@@ -472,19 +456,20 @@ public:
     // structs.
     static void GenStructArgs(const StructDef &struct_def, CodeWriter &code,
                               const char *nameprefix) {
-        for (auto it = struct_def.fields.vec.begin();
-             it != struct_def.fields.vec.end(); ++it) {
-            auto &field = **it;
+        for (auto it : struct_def.fields.vec) {
+            auto &field = *it;
             if (IsStruct(field.value.type)) {
-                // Generate arguments for a struct inside a struct. To ensure names
-                // don't clash, and to make it obvious these arguments are constructing
-                // a nested struct, prefix the name with the field name.
+                // Generate arguments for a struct inside a struct. To ensure
+                // names don't clash, and to make it obvious these arguments are
+                // constructing a nested struct, prefix the name with the field
+                // name.
                 GenStructArgs(*field.value.type.struct_def, code,
                               (nameprefix + (field.name + "_")).c_str());
             } else {
                 code += std::string(", ") + nameprefix + "\\";
                 code += MakeCamel(field.name) + ": \\";
-                code += GenTypeBasic(DestinationType(field.value.type, false)) + "\\";
+                code += GenTypeBasic(DestinationType(field.value.type, false)) 
+                        + "\\";
             }
         }
     }
@@ -526,8 +511,7 @@ public:
 
     std::string GenOffsetGetter(flatbuffers::FieldDef *key_field,
                                 const char *num = nullptr) const {
-        std::string key_offset = "";
-        key_offset += std::string("") + "__offset(" +
+        std::string key_offset = "__offset(" + 
                 NumToString(key_field->value.offset) + ", ";
         if (num) {
             key_offset += num;
@@ -539,40 +523,10 @@ public:
         return key_offset;
     }
 
-    std::string GenKeyGetter(flatbuffers::FieldDef *key_field) const {
-        std::string key_getter = "";
-        auto data_buffer = "_bb";
-        if (key_field->value.type.base_type == BASE_TYPE_STRING) {
-            key_getter += " return ";
-            key_getter += std::string("");
-            key_getter += "compareStrings(";
-            key_getter += GenOffsetGetter(key_field, "o1") + ", ";
-            key_getter += GenOffsetGetter(key_field, "o2") + ", " + data_buffer + ")";
-        } else {
-            auto field_getter = GenGetterForLookupByKey(key_field, data_buffer, "o1");
-            key_getter +=
-                        "\n    " + GenTypeNameDest(key_field->value.type) + " val_1 = ";
-                key_getter +=
-                        field_getter + "\n    " + GenTypeNameDest(key_field->value.type);
-                key_getter += " val_2 = ";
-                field_getter = GenGetterForLookupByKey(key_field, data_buffer, "o2");
-                key_getter += field_getter + "\n";
-                key_getter +=
-                        "    return val_1 > val_2 ? 1 : val_1 < val_2 ? -1 : 0;\n ";
-        }
-        return key_getter;
-    }
-
     void GenStruct(StructDef &struct_def, std::string *code_ptr) const {
         if (struct_def.generated) return;
         std::string &code = *code_ptr;
 
-        // Generate a struct accessor class, with methods of the form:
-        // public type name() { return bb.getType(i + offset); }
-        // or for tables of the form:
-        // public type name() {
-        //   int o = __offset(offset); return o != 0 ? bb.getType(o + i) : default;
-        // }
         GenComment(struct_def.doc_comment, code_ptr, &comment_config);
         auto fixed = struct_def.fixed;
 
@@ -624,8 +578,8 @@ public:
                     // Static Add for fields
                     auto fields = struct_def.fields.vec;
                     int field_pos = -1;
-                    for (auto it = fields.begin(); it != fields.end(); ++it) {
-                        auto &field = **it;
+                    for (auto it : fields) {
+                        auto &field = *it;
                         field_pos++;
                         if (field.deprecated) continue;
                         if (field.key) key_field = &field;
@@ -641,14 +595,14 @@ public:
                     }
 
                     GenerateEndStructMethod(struct_def, writer);
-
+                    auto file_identifier = parser_.file_identifier_;
                     if (parser_.root_struct_def_ == &struct_def) {
                         GenerateFinishStructBuffer(struct_def,
-                                                   parser_.file_identifier_,
+                                                   file_identifier,
                                                    writer);
-                        GenerateFinishSizePrefixedStructBuffer(struct_def,
-                                                               parser_.file_identifier_,
-                                                               writer);
+                        GenerateFinishSizePrefixed(struct_def,
+                                                   file_identifier,
+                                                   writer);
                     }
 
                     if (struct_def.has_key) {
@@ -697,7 +651,7 @@ public:
                 code += GenOffsetGetter(key_field) + "\\";
                 code += ", byteKey, bb)";
             } else {
-                auto get_val = GenGetterForLookupByKey(key_field, "bb");
+                auto get_val = GenLookupByKey(key_field, "bb");
                 code += "val value = " + get_val;
                 code += "val comp = (value - key).sign";
             }
@@ -728,8 +682,8 @@ public:
                     statements);
     }
 
-    void GenerateFinishSizePrefixedStructBuffer(StructDef &struct_def,
-                                                std::string identifier,
+    void GenerateFinishSizePrefixed(StructDef &struct_def,
+                                                const std::string &identifier,
                                                 CodeWriter &code) const {
         auto id = identifier.length() > 0  ? ", \"" + identifier + "\"" : "";
         auto params = "builder: FlatBufferBuilder, offset: Int";
@@ -738,7 +692,7 @@ public:
         GenerateFunOneLine(code, method_name, params, "",one_line);
     }
     void GenerateFinishStructBuffer(StructDef &struct_def,
-                                    std::string identifier,
+                                    const std::string &identifier,
                                     CodeWriter &code) const {
         auto id = identifier.length() > 0  ? ", \"" + identifier + "\"" : "";
         auto params = "builder: FlatBufferBuilder, offset: Int";
@@ -755,10 +709,10 @@ public:
         auto field_vec = struct_def.fields.vec;
 
         GenerateFun(code, name, params, returns, [&](CodeWriter &code){
-            code += "val o = builder.endObject()";
+            code += "val o = builder.endTable()";
             code.IncrementIdentLevel();
-            for (auto it = field_vec.begin(); it != field_vec.end(); ++it) {
-                auto &field = **it;
+            for (auto it : field_vec) {
+                auto &field = *it;
                 if (field.deprecated || !field.required) {
                     continue;
                 }
@@ -818,7 +772,7 @@ public:
             code.SetValue("field_name", MakeCamel(Esc(field.name), false));
             code.SetValue("method_name", method);
             code.SetValue("pos", field_pos);
-            code.SetValue("default", GenDefaultValue(field, false));
+            code.SetValue("default", GenDefaultValue(field));
             code.SetValue("cast_1", FlexBufferBuilderCast(method, field, true));
             code.SetValue("cast_2", FlexBufferBuilderCast(method, field, false));
 
@@ -830,13 +784,13 @@ public:
         });
     }
 
-    static std::string FlexBufferBuilderCast(std::string method,
+    static std::string FlexBufferBuilderCast(const std::string &method,
                                       FieldDef &field,
                                       bool isFirst) {
-        FLATBUFFERS_ASSERT(fb_builder_add_table_param_map.find(method) != fb_builder_add_table_param_map.end());
+        FLATBUFFERS_ASSERT(fbb_param_map.find(method) != fbb_param_map.end());
         auto field_type = GenTypeBasic(DestinationType(field.value.type, false));
-        auto param_types = fb_builder_add_table_param_map[method];
-        if ( fb_builder_add_table_param_map.find(method) == fb_builder_add_table_param_map.end() )
+        auto param_types = fbb_param_map[method];
+        if ( fbb_param_map.find(method) == fbb_param_map.end() )
             return "";
 
 
@@ -846,11 +800,11 @@ public:
         return "";
     }
 
-    // fun startMonster(builder: FlatBufferBuilder) = builder.startObject(11)
+    // fun startMonster(builder: FlatBufferBuilder) = builder.startTable(11)
     void GenerateStartStructMethod(StructDef &struct_def, CodeWriter &code) const {
         GenerateFunOneLine(code, "start" + Esc(struct_def.name),
                            "builder: FlatBufferBuilder", "",
-                           "builder.startObject("+
+                           "builder.startTable("+
                            NumToString(struct_def.fields.vec.size()) + ")");
     }
 
@@ -862,8 +816,8 @@ public:
         int num_fields = 0;
         auto fields_vec = struct_def.fields.vec;
 
-        for (auto it = fields_vec.begin(); it != fields_vec.end(); ++it) {
-            auto &field = **it;
+        for (auto it : fields_vec) {
+            auto &field = *it;
             if (field.deprecated) continue;
             if (IsStruct(field.value.type)) {
                 has_no_struct_fields = false;
@@ -880,8 +834,8 @@ public:
             auto name = "create" + Esc(struct_def.name);
             std::stringstream params;
             params << "builder: FlatBufferBuilder";
-            for (auto it = fields_vec.begin(); it != fields_vec.end(); ++it) {
-                auto &field = **it;
+            for (auto it : fields_vec) {
+                auto &field = *it;
                 if (field.deprecated) continue;
                 params << ", " << MakeCamel(Esc(field.name), false);
                 if (!IsScalar(field.value.type.base_type)){
@@ -896,7 +850,7 @@ public:
                 auto fields_vec = struct_def.fields.vec;
                 code.SetValue("vec_size", NumToString(fields_vec.size()));
 
-                code += "builder.startObject({{vec_size}})";
+                code += "builder.startTable({{vec_size}})";
 
                 auto sortbysize = struct_def.sortbysize;
                 auto largest = sortbysize ? sizeof(largest_scalar_t) : 1;
@@ -907,8 +861,10 @@ public:
                         auto base_type_size = SizeOf(field.value.type.base_type);
                         if (!field.deprecated &&
                                 (!sortbysize || size == base_type_size)) {
-                            code.SetValue("camel_field_name", MakeCamel(Esc(field.name), true));
-                            code.SetValue("field_name", MakeCamel(Esc(field.name), false));
+                            code.SetValue("camel_field_name", 
+                                          MakeCamel(Esc(field.name), true));
+                            code.SetValue("field_name", 
+                                          MakeCamel(Esc(field.name), false));
 
                             code += "add{{camel_field_name}}(builder, {{field_name}}\\";
                             if (!IsScalar(field.value.type.base_type)){
@@ -925,22 +881,23 @@ public:
     }
     void GenerateBufferHasIdentifier(StructDef &struct_def,
                                      CodeWriter &writer) const {
+        auto file_identifier = parser_.file_identifier_;
         // Check if a buffer has the identifier.
-        if (parser_.root_struct_def_ != &struct_def || !parser_.file_identifier_.length())
+        if (parser_.root_struct_def_ != &struct_def || !file_identifier.length())
             return;
         auto name = Esc(struct_def.name);
         GenerateFunOneLine(writer, name + "BufferHasIdentifier",
                            "_bb: ByteBuffer",
                            "Boolean",
-                           "__has_identifier(_bb, \"" + parser_.file_identifier_ + "\")"
+                           "__has_identifier(_bb, \"" + file_identifier + "\")"
                            );
     }
 
     void GenerateStructGetters(StructDef &struct_def, CodeWriter &writer) const {
         auto fields_vec = struct_def.fields.vec;
         FieldDef *key_field = nullptr;
-        for (auto it = fields_vec.begin(); it != fields_vec.end(); ++it) {
-            auto &field = **it;
+        for (auto it : fields_vec) {
+            auto &field = *it;
             if (field.deprecated) continue;
             if (field.key) key_field = &field;
 
@@ -958,8 +915,9 @@ public:
             auto getter = GenGetter(field.value.type);
             auto getter_cast = TypeConversor(field_type, return_type);
             auto offset_val = NumToString(field.value.offset);
-            auto offset_prefix = "val o = __offset(" + offset_val + "); return o != 0 ? ";
-
+            auto offset_prefix = "val o = __offset(" + offset_val 
+                                 + "); return o != 0 ? ";
+            auto value_base_type = field.value.type.base_type;
             // Most field accessors need to retrieve and test the field offset
             // first, this is the offset value for that:
             writer.SetValue("offset", NumToString(field.value.offset));
@@ -972,56 +930,64 @@ public:
             writer.SetValue("cast", getter_cast);
 
             // Generate the accessors that don't do object reuse.
-            if (field.value.type.base_type == BASE_TYPE_STRUCT) {
-                // Calls the accessor that takes an accessor object with a new object.
+            if (value_base_type == BASE_TYPE_STRUCT) {
+                // Calls the accessor that takes an accessor object with a
+                // new object.
                 // val pos
                 //     get() = pos(Vec3())
                 GenerateGetterOneLine(writer,
                                       field_name,
-                                      return_type + "?", [&](CodeWriter &writer){
+                                      return_type + "?",
+                                      [&](CodeWriter &writer){
                     writer += "{{field_name}}({{field_type}}())";
                 });
-            } else if (field.value.type.base_type == BASE_TYPE_VECTOR &&
+            } else if (value_base_type == BASE_TYPE_VECTOR &&
                        field.value.type.element == BASE_TYPE_STRUCT) {
-                // Accessors for vectors of structs also take accessor objects, this
-                // generates a variant without that argument.
-                // e.g. fun weapons(j: Int) = weapons(Weapon(), j)
-                GenerateFunOneLine(writer, field_name, "j: Int", return_type + "?",
+                // Accessors for vectors of structs also take accessor objects, 
+                // this generates a variant without that argument.
+                // ex: fun weapons(j: Int) = weapons(Weapon(), j)
+                GenerateFunOneLine(writer, 
+                                   field_name, 
+                                   "j: Int", 
+                                   return_type + "?",
                             [&](CodeWriter &writer){
                     writer += "{{field_name}}({{return_type}}(), j)";
                 });
             }
 
-            if (IsScalar(field.value.type.base_type)) {
+            if (IsScalar(value_base_type)) {
                 if (struct_def.fixed) {
                     GenerateGetterOneLine(writer, field_name, return_type,
                                    [&](CodeWriter &writer){
-                        writer += "{{field_read_func}}(bb_pos + {{offset}}){{cast}}{{field_mask}}";
+                        writer += "{{field_read_func}}(bb_pos + {{offset}})"
+                                  "{{cast}}{{field_mask}}";
                     });
                 } else {
                     GenerateGetter(writer, field_name, return_type,
                                    [&](CodeWriter &writer){
                         writer += "val o = __offset({{offset}})";
-                        writer += "return if(o != 0) {{field_read_func}}(o + bb_pos){{cast}}{{field_mask}} else {{field_default}}";
+                        writer += "return if(o != 0) {{field_read_func}}"
+                                  "(o + bb_pos){{cast}}{{field_mask}} else "
+                                  "{{field_default}}";
                     });
                 }
             } else {
-                switch (field.value.type.base_type) {
+                switch (value_base_type) {
                 case BASE_TYPE_STRUCT:
-
                     if (struct_def.fixed) {
                         // create getter with object reuse
-                        // e.g.
-                        //  fun pos(obj: Vec3) : Vec3? = obj.__assign(bb_pos + 4, bb)
+                        // ex:
+                        // fun pos(obj: Vec3) : Vec3? = obj.__assign(bb_pos + 4, bb)
                         // ? adds nullability annotation
-                        GenerateFunOneLine(writer, field_name, "obj: " + field_type ,
-                                    return_type + "?",
-                                    [&](CodeWriter &writer){
+                        GenerateFunOneLine(writer, 
+                                           field_name, "obj: " + field_type ,
+                                           return_type + "?",
+                                           [&](CodeWriter &writer){
                             writer += "obj.__assign(bb_pos + {{offset}}, bb)";
                         });
                     } else {
                         // create getter with object reuse
-                        // e.g.
+                        // ex:
                         //  fun pos(obj: Vec3) : Vec3? {
                         //      val o = __offset(4)
                         //      return if(o != 0) {
@@ -1046,11 +1012,11 @@ public:
                 case BASE_TYPE_STRING:
                     // create string getter
                     // e.g.
-                    //      val Name : String?
-                    //          get() = {
-                    //              val o = __offset(10)
-                    //              return if (o != 0) __string(o + bb_pos) else null
-                    //          }
+                    // val Name : String?
+                    //     get() = {
+                    //         val o = __offset(10)
+                    //         return if (o != 0) __string(o + bb_pos) else null
+                    //     }
                     // ? adds nullability annotation
                     GenerateGetter(writer, field_name, return_type + "?",
                                    [&](CodeWriter &writer){
@@ -1061,7 +1027,14 @@ public:
                     break;
                 case BASE_TYPE_VECTOR: {
                     // e.g.
-                    // fun inventory(int j) : Int { val o = __offset(14); return o != 0 ? bb.get(__vector(o) + j * 1).toInt().and(0xFF) : 0; }
+                    // fun inventory(j: Int) : Int {
+                    //     val o = __offset(14)
+                    //     return if (o != 0) {
+                    //         bb.get(__vector(o) + j * 1).toInt().and(0xFF)
+                    //     } else {
+                    //        0
+                    //     }
+                    // }
 
                     auto vectortype = field.value.type.VectorType();
                     std::string params = "j: Int";
@@ -1077,7 +1050,6 @@ public:
                     writer.SetValue("toType", TypeConversor(field_type,
                                                             return_type));
 
-//TODO: field_read_func is not properly working
                     GenerateFun(writer, field_name, params,
                                 return_type + nullable,
                                 [&](CodeWriter &writer){
@@ -1107,7 +1079,8 @@ public:
                     GenerateFun(writer, field_name, "obj: " + field_type,
                                 return_type + "?",
                                 [&](CodeWriter &writer){
-                        writer += OffsetWrapperOneLine(offset_val, getter + "(obj, o)",
+                        writer += OffsetWrapperOneLine(offset_val, 
+                                                       getter + "(obj, o)",
                                                        "null");
                     });
                     break;
@@ -1116,7 +1089,7 @@ public:
                 }
             }
 
-            if (field.value.type.base_type == BASE_TYPE_VECTOR) {
+            if (value_base_type == BASE_TYPE_VECTOR) {
                 // Generate Lenght functions for vectors
                 GenerateGetter(writer, field_name + "Length", "Int",
                                [&](CodeWriter &writer){
@@ -1129,8 +1102,8 @@ public:
                         !field.value.type.struct_def->fixed) {
                     auto &sd = *field.value.type.struct_def;
                     auto &fields = sd.fields.vec;
-                    for (auto kit = fields.begin(); kit != fields.end(); ++kit) {
-                        auto &key_field = **kit;
+                    for (auto kit : fields) {
+                        auto &key_field = *kit;
                         if (key_field.key) {
                             auto qualified_name = WrapInNameSpace(sd);
                             auto name = MakeCamel(Esc(field.name), false) + "ByKey";
@@ -1148,7 +1121,9 @@ public:
                                               "null");
                             });
 
-                            auto param2 = "obj: " + qualified_name + ", key: " + GenTypeNameDest(key_field.value.type);
+                            auto param2 = "obj: " + qualified_name + 
+                                    ", key: " + 
+                                    GenTypeNameDest(key_field.value.type);
                             GenerateFun(writer,
                                         name,
                                         param2,
@@ -1167,11 +1142,11 @@ public:
                 }
             }
 
-            if ((field.value.type.base_type == BASE_TYPE_VECTOR &&
+            if ((value_base_type == BASE_TYPE_VECTOR &&
                  IsScalar(field.value.type.VectorType().base_type)) ||
-                    field.value.type.base_type == BASE_TYPE_STRING) {
+                    value_base_type == BASE_TYPE_STRING) {
 
-                auto end_idx = NumToString(field.value.type.base_type == BASE_TYPE_STRING
+                auto end_idx = NumToString(value_base_type == BASE_TYPE_STRING
                                            ? 1
                                            : InlineSize(field.value.type.VectorType()));
                 // Generate a ByteBuffer accessor for strings & vectors of scalars.
@@ -1188,7 +1163,8 @@ public:
 
                 // Generate a ByteBuffer accessor for strings & vectors of scalars.
                 // e.g.
-                // fun inventoryInByteBuffer(_bb: Bytebuffer): ByteBuffer = __vector_as_bytebuffer(_bb, 14, 1)
+                // fun inventoryInByteBuffer(_bb: Bytebuffer): 
+                //     ByteBuffer = __vector_as_bytebuffer(_bb, 14, 1)
                 GenerateFunOneLine(writer, field_name + "InByteBuffer",
                                    "_bb: ByteBuffer", "ByteBuffer",
                             [&](CodeWriter &writer){
@@ -1198,7 +1174,8 @@ public:
             }
 
             // generate object accessors if is nested_flatbuffer
-            //fun testnestedflatbufferAsMonster() : Monster? { return testnestedflatbufferAsMonster(new Monster()); }
+            //fun testnestedflatbufferAsMonster() : Monster? 
+            //{ return testnestedflatbufferAsMonster(new Monster()); }
 
             if (field.nested_flatbuffer) {
                 auto nested_type_name = WrapInNameSpace(*field.nested_flatbuffer);
@@ -1292,8 +1269,8 @@ public:
                             "_bb), __offset({{offset}}, o2, _bb), _bb)";
 
                 } else {
-                    auto getter1 = GenGetterForLookupByKey(key_field, data_buffer, "o1");
-                    auto getter2 = GenGetterForLookupByKey(key_field, data_buffer, "o2");
+                    auto getter1 = GenLookupByKey(key_field, data_buffer, "o1");
+                    auto getter2 = GenLookupByKey(key_field, data_buffer, "o2");
                     code += "val val_1 = " + getter1;
                     code += "val val_2 = " + getter2;
                     code += "return (val_1 - val_2).sign";
@@ -1302,30 +1279,34 @@ public:
         }
     }
 
-    static std::string TypeConversor(std::string from_type,
-                                     std::string to_type) {
+    static std::string TypeConversor(const std::string &from_type,
+                                     const std::string &to_type) {
         if (to_type == "Boolean")
             return ".toInt() != 0";
 
         if (from_type == to_type)
             return "";
 
-        if (to_type == "Int") {
+        if (to_type == "Int")
             return ".toInt()";
-        } else if (to_type == "Short") {
+        
+        if (to_type == "Short")
             return ".toShort()";
-        } else if (to_type == "Long") {
+        
+        if (to_type == "Long")
             return ".toLong()";
-        } else if (to_type == "Byte") {
+        
+        if (to_type == "Byte")
            return ".toByte()";
-        } else if (to_type == "Boolean") {
+        
+        if (to_type == "Boolean")
             return ".toInt() != 0";
-        }
+        
         return "";
     }
 
     void GenerateCompanionObject(CodeWriter &code,
-                                 CodeblockFunction callback) const {
+                                 const Codeblock &callback) const {
         code += "companion object {";
         code.IncrementIdentLevel();
         callback(code);
@@ -1333,10 +1314,10 @@ public:
         code += "}";
     }
 
-    static void GenerateGetRootAsAccessors(std::string struct_name,
+    static void GenerateGetRootAsAccessors(const std::string &struct_name,
                                            CodeWriter &code) {
         // Generate a special accessor for the table that when used as the root
-        // e.g. `fun getRootAsMonster(_bb: ByteBuffer): Monster {...}`
+        // ex: fun getRootAsMonster(_bb: ByteBuffer): Monster {...}
         code.SetValue("gr_name", struct_name);
         code.SetValue("gr_method", "getRootAs" + struct_name);
 
@@ -1345,7 +1326,7 @@ public:
         code += "{{gr_method}}(_bb, {{gr_name}}())";
 
         // create method that allows object reuse
-        // e.g. fun Monster getRootAsMonster(_bb: ByteBuffer, obj: Monster) {...}
+        // ex: fun Monster getRootAsMonster(_bb: ByteBuffer, obj: Monster) {...}
         code += "fun {{gr_method}}"
                  "(_bb: ByteBuffer, obj: {{gr_name}}): {{gr_name}} {";
         code.IncrementIdentLevel();
@@ -1370,23 +1351,25 @@ public:
     }
 
     static std::string StructConstructorParams(const StructDef &struct_def,
-                                               std::string prefix = "") {
+                                               const std::string &prefix = "") {
         //builder: FlatBufferBuilder
         std::stringstream out;
         auto field_vec = struct_def.fields.vec;
         if (prefix.empty()) {
             out << "builder: FlatBufferBuilder";
         }
-        for (auto it = field_vec.begin(); it != field_vec.end(); ++it) {
-            auto &field = **it;
+        for (auto it : field_vec) {
+            auto &field = *it;
             if (IsStruct(field.value.type)) {
-                // Generate arguments for a struct inside a struct. To ensure names
-                // don't clash, and to make it obvious these arguments are constructing
-                // a nested struct, prefix the name with the field name.
+                // Generate arguments for a struct inside a struct. To ensure 
+                // names don't clash, and to make it obvious these arguments are
+                // constructing a nested struct, prefix the name with the field
+                // name.
                 out << StructConstructorParams(*field.value.type.struct_def,
-                                                  prefix + (Esc(field.name) + "_"));
+                                              prefix + (Esc(field.name) + "_"));
             } else {
-                out << ", " << prefix << MakeCamel(Esc(field.name), false) << ": "
+                out << ", " << prefix << MakeCamel(Esc(field.name), false) 
+                    << ": "
                     << GenTypeBasic(DestinationType(field.value.type, false));
             }
         }
@@ -1394,9 +1377,9 @@ public:
     }
 
     static void GeneratePropertyOneLine(CodeWriter &code,
-                               std::string name,
-                               std::string type,
-                               CodeblockFunction body) {
+                               const std::string &name,
+                               const std::string &type,
+                               const Codeblock &body) {
         // Generates Kotlin getter for properties
         // e.g.:
         // val prop: Mytype = x
@@ -1406,9 +1389,9 @@ public:
         body(code);
     }
     static void GenerateGetterOneLine(CodeWriter &code,
-                               std::string name,
-                               std::string type,
-                               CodeblockFunction body) {
+                               const std::string &name,
+                               const std::string &type,
+                               const Codeblock &body) {
         // Generates Kotlin getter for properties
         // e.g.:
         // val prop: Mytype get() = x
@@ -1419,9 +1402,9 @@ public:
     }
 
     static void GenerateGetter(CodeWriter &code,
-                               std::string name,
-                               std::string type,
-                               CodeblockFunction body) {
+                               const std::string &name,
+                               const std::string &type,
+                               const Codeblock &body) {
         // Generates Kotlin getter for properties
         // e.g.:
         // val prop: Mytype
@@ -1441,10 +1424,10 @@ public:
     }
 
     static void GenerateFun(CodeWriter &code,
-                            std::string name,
-                            std::string params,
-                            std::string returnType,
-                            CodeblockFunction body) {
+                            const std::string &name,
+                            const std::string &params,
+                            const std::string &returnType,
+                            const Codeblock &body) {
         // Generates Kotlin function
         // e.g.:
         // fun path(j: Int): Vec3 {
@@ -1462,10 +1445,10 @@ public:
     }
 
     static void GenerateFunOneLine(CodeWriter &code,
-                                   std::string name,
-                                   std::string params,
-                                   std::string returnType,
-                                   CodeblockFunction body) {
+                                   const std::string &name,
+                                   const std::string &params,
+                                   const std::string &returnType,
+                                   const Codeblock &body) {
         // Generates Kotlin function
         // e.g.:
         // fun path(j: Int): Vec3 = return path(Vec3(), j)
@@ -1478,10 +1461,10 @@ public:
     }
 
     static void GenerateOverrideFun(CodeWriter &code,
-                                   std::string name,
-                                   std::string params,
-                                   std::string returnType,
-                                   CodeblockFunction body) {
+                                   const std::string &name,
+                                   const std::string &params,
+                                   const std::string &returnType,
+                                   const Codeblock &body) {
         // Generates Kotlin function
         // e.g.:
         // override fun path(j: Int): Vec3 = return path(Vec3(), j)
@@ -1490,10 +1473,10 @@ public:
     }
 
     static void GenerateOverrideFunOneLine(CodeWriter &code,
-                                   std::string name,
-                                   std::string params,
-                                   std::string returnType,
-                                   std::string statement) {
+                                   const std::string &name,
+                                   const std::string &params,
+                                   const std::string &returnType,
+                                   const std::string &statement) {
         // Generates Kotlin function
         // e.g.:
         // override fun path(j: Int): Vec3 = return path(Vec3(), j)
@@ -1506,10 +1489,10 @@ public:
     }
 
     static void GenerateFunOneLine(CodeWriter &code,
-                                   std::string name,
-                                   std::string params,
-                                   std::string returnType,
-                                   std::string statement) {
+                                   const std::string &name,
+                                   const std::string &params,
+                                   const std::string &returnType,
+                                   const std::string &statement) {
         // Generates Kotlin function
         // e.g.:
         // fun path(j: Int): Vec3 = return path(Vec3(), j)
@@ -1521,16 +1504,17 @@ public:
         code += statement;
     }
 
-    static std::string OffsetWrapperOneLine(std::string offset, std::string found,
-                                            std::string not_found) {
+    static std::string OffsetWrapperOneLine(const std::string &offset, 
+                                            const std::string &found,
+                                            const std::string &not_found) {
         return "val o = __offset(" + offset + "); return if (o != 0) " + found +
                 " else " + not_found;
     }
 
     static void OffsetWrapper(CodeWriter &code,
-                       std::string offset,
-                       CodeblockFunction found,
-                       CodeblockFunction not_found) {
+                       const std::string &offset,
+                       const Codeblock &found,
+                       const Codeblock &not_found) {
         code += "val o = __offset(" + offset + ")";
         code +="return if (o != 0) {";
         code.IncrementIdentLevel();
@@ -1544,9 +1528,9 @@ public:
     }
 
     static void OffsetWrapper(CodeWriter &code,
-                       std::string offset,
-                       std::string found,
-                       std::string not_found) {
+                       const std::string &offset,
+                       const std::string &found,
+                       const std::string &not_found) {
         code += "val o = __offset(" + offset + ")";
         code +="return if (o != 0) {";
         code.IncrementIdentLevel();
@@ -1559,7 +1543,7 @@ public:
         code += "}";
     }
 
-    static std::string Indirect(std::string index, bool fixed) {
+    static std::string Indirect(const std::string &index, bool fixed) {
         // We apply __indirect() and struct is not fixed.
         if (!fixed)
             return "__indirect(" + index + ")";
