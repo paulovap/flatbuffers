@@ -18,6 +18,9 @@
 #define FLATBUFFERS_FLEXBUFFERS_H_
 
 #include <map>
+#include <iostream>
+#include <sstream>
+#include <string>
 // Used to select STL variant.
 #include "flatbuffers/base.h"
 // We use the basic binary writing functions from the regular FlatBuffers.
@@ -970,6 +973,16 @@ class Builder FLATBUFFERS_FINAL_CLASS {
   size_t String(const char *str, size_t len) {
     auto reset_to = buf_.size();
     auto sloc = CreateBlob(str, len, 1, FBT_STRING);
+    std::cout << str << ": " << std::endl
+              << "start: " << reset_to << std::endl
+              << "end  : " << sloc + len + 1 << std::endl
+              << "val: [";
+    for (auto i=reset_to; i<(sloc + len + 1); i++) {
+        std::cout << std::to_string(buf_[i]) << ",";
+    }
+    std::cout << "]\n";
+
+
     if (flags_ & BUILDER_FLAG_SHARE_STRINGS) {
       StringOffset so(sloc, len);
       auto it = string_pool.find(so);

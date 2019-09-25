@@ -78,6 +78,12 @@ set(FlatBuffers_Library_SRCS
   src/util.cpp
 )
 
+set(FlexBuffers_SRCS
+  ${FlatBuffers_Library_SRCS}
+  include/flatbuffers/flexbuffers.h
+  src/flexb.cpp
+)
+
 set(FlatBuffers_Compiler_SRCS
   ${FlatBuffers_Library_SRCS}
   src/idl_gen_cpp.cpp
@@ -291,6 +297,8 @@ if(FLATBUFFERS_BUILD_FLATC)
     target_compile_options(flatc PUBLIC $<$<CONFIG:Release>:/MT>)
   endif()
 endif()
+
+add_executable(flexb ${FlexBuffers_SRCS})
 
 if(FLATBUFFERS_BUILD_FLATHASH)
   add_executable(flathash ${FlatHash_SRCS})
