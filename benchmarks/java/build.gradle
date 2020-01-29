@@ -1,0 +1,41 @@
+buildscript {
+  repositories {
+    jcenter()
+    maven {
+      url "https://plugins.gradle.org/m2/"
+    }
+  }
+  dependencies {
+    classpath "me.champeau.gradle:jmh-gradle-plugin:0.5.0"
+  }
+}
+
+
+plugins {
+  id 'java'
+  id "me.champeau.gradle.jmh" version "0.5.0"
+}
+
+repositories {
+  jcenter()
+}
+
+dependencies {
+  jmh 'org.openjdk.jmh:jmh-core:1.21'
+  jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.21'
+  jmh 'commons-io:commons-io:2.4'
+}
+
+sourceSets {
+  main {
+    java {
+      srcDirs '../../java/'
+    }
+  }
+}
+jmh {
+  benchmarkMode=['thrpt','sample']
+  fork=1
+}
+
+
