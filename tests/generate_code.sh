@@ -30,24 +30,24 @@ TEST_BASE_FLAGS="--reflect-names --gen-mutable --gen-object-api"
 TEST_RUST_FLAGS="$TEST_BASE_FLAGS --gen-name-strings"
 TEST_NOINCL_FLAGS="$TEST_BASE_FLAGS --no-includes --no-fb-import"
 
-../flatc --binary --cpp --java --kotlin  --csharp --dart --go --lobster --lua --js --ts --php --swift --grpc \
+../flatc --binary --cpp --kotlin  --csharp --dart --go --lobster --lua --js --ts --php --swift --grpc \
 $TEST_NOINCL_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS -I include_test monster_test.fbs monsterdata_test.json
 ../flatc --rust $TEST_RUST_FLAGS -I include_test monster_test.fbs monsterdata_test.json
 
 ../flatc --python $TEST_BASE_FLAGS -I include_test monster_test.fbs monsterdata_test.json
 
-../flatc --cpp --java --kotlin --csharp --dart --go --binary --lobster --lua --js --ts --php --python --rust \
+../flatc --cpp --kotlin --csharp --dart --go --binary --lobster --lua --js --ts --php --python --rust \
 $TEST_NOINCL_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS -o namespace_test namespace_test/namespace_test1.fbs namespace_test/namespace_test2.fbs
 
-../flatc --cpp --java --kotlin --csharp --js --ts --php --swift $TEST_BASE_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS -o union_vector ./union_vector/union_vector.fbs
+../flatc --cpp --kotlin --csharp --js --ts --php --swift $TEST_BASE_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS -o union_vector ./union_vector/union_vector.fbs
 ../flatc --rust -I include_test -o include_test include_test/include_test1.fbs
 ../flatc --rust -I include_test -o include_test/sub include_test/sub/include_test2.fbs
 ../flatc -b --schema --bfbs-comments --bfbs-builtins -I include_test monster_test.fbs
 ../flatc --cpp --bfbs-comments --bfbs-builtins --bfbs-gen-embed $TEST_NOINCL_FLAGS $TEST_CPP_FLAGS -I include_test monster_test.fbs
 ../flatc -b --schema --bfbs-comments --bfbs-builtins -I include_test arrays_test.fbs
 ../flatc --jsonschema --schema -I include_test monster_test.fbs
-../flatc --cpp --java --kotlin --csharp --python $TEST_NOINCL_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS monster_extra.fbs monsterdata_extra.json
-../flatc --cpp --java --csharp --jsonschema $TEST_NOINCL_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS --scoped-enums arrays_test.fbs
+../flatc --cpp --kotlin --csharp --python $TEST_NOINCL_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS monster_extra.fbs monsterdata_extra.json
+../flatc --cpp --csharp --jsonschema $TEST_NOINCL_FLAGS $TEST_CPP_FLAGS $TEST_CS_FLAGS --scoped-enums arrays_test.fbs
 ../flatc --python $TEST_BASE_FLAGS arrays_test.fbs
 ../flatc --dart monster_extra.fbs
 

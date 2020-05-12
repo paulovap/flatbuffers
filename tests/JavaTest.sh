@@ -18,26 +18,5 @@ set -o errexit
 
 echo Compile then run the Java test.
 
-java -version
-
-testdir=$(dirname $0)
-
-targetdir="${testdir}/target"
-
-if [[ -e "${targetdir}" ]]; then
-    echo "cleaning target"
-    rm -rf "${targetdir}"
-fi
-
-mkdir -v "${targetdir}"
-
-if ! find "${testdir}/../java" -type f -name "*.class" -delete; then
-    echo "failed to clean .class files from java directory" >&2
-    exit 1
-fi
-
-javac -d "${targetdir}" -classpath "${testdir}/../java:${testdir}:${testdir}/namespace_test:${testdir}/union_vector" "${testdir}/JavaTest.java"
-
-(cd "${testdir}" && java -classpath "${targetdir}" JavaTest )
-
-rm -rf "${targetdir}"
+cd ../java
+./gradlew check

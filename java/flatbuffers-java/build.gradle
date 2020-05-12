@@ -1,0 +1,57 @@
+apply plugin: 'java'
+
+repositories {
+    mavenCentral()
+}
+
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+//sourceSets {
+//  test {
+//    java {
+//      srcDirs = ["../tests/"]
+//      filter {
+//        include ['../test/**/*.java']
+//        exclude '**/*.kt'
+//        exclude ['MonsterStorageGrpc.java', '../test/**/*.kt']
+//      }
+//    }
+//  }
+//}
+
+dependencies {
+  testCompile "junit:junit:4.11"
+}
+
+jar {
+    baseName = 'flatbuffers-java'
+    version =  '0.1.0'
+}
+
+task generateFlatbufferTestSources {
+  doLast {
+    String testDir = file("${rootProject.projectDir}/../tests")
+    String outputDir = file("src/test/java/")
+    def baseArgs = ['flatc', '--gen-mutable', '-o', outputDir, '--java']
+    exec {
+      def include = "${rootProject.projectDir}/../tests/include_test"
+      commandLine baseArgs + ['-I',  include, "${testDir}/monster_test.fbs"]
+    }
+    exec {
+      def fbsFiles = ["${testDir}/namespace_test/namespace_test1.fbs",
+                      "${testDir}/namespace_test/namespace_test2.fbs"]
+      commandLine baseArgs + fbsFiles
+    }
+    exec {
+      commandLine baseArgs + ["${testDir}/union_vector/union_vector.fbs"]
+    }
+    exec {
+      commandLine baseArgs + ["${testDir}/monster_extra.fbs"]
+    }
+    exec {
+      commandLine baseArgs + ['--scoped-enums', "${testDir}/arrays_test.fbs"]
+    }
+  }
+}

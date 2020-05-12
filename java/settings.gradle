@@ -1,0 +1,3 @@
+rootProject.name = 'flatbuffers'
+include 'flatbuffers-java'
+include 'flatbuffers-java-grpc'

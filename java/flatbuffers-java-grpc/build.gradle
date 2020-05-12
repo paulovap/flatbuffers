@@ -1,0 +1,16 @@
+apply plugin: 'java'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+  compile project(':flatbuffers-java')
+  compile group: 'io.grpc', name: 'grpc-core', version: '1.29.0'
+}
+
+jar {
+  baseName = 'flatbuffers-java-grpc'
+  version =  '0.1.0'
+}
+

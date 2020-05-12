@@ -1,0 +1,14 @@
+buildscript {
+  repositories {
+    jcenter()
+  }
+}
+
+group 'com.google'
+version '1.0-SNAPSHOT'
+
+allprojects {
+  repositories {
+    jcenter()
+  }
+}
