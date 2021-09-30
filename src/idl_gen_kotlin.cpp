@@ -117,9 +117,8 @@ class KotlinGenerator : public BaseGenerator {
       code += "\n\n";
     }
     if (needs_includes) {
-      code += "import java.nio.*\n";
+      code += "import com.google.flatbuffers.kotlin.*\n";
       code += "import kotlin.math.sign\n";
-      code += "import com.google.flatbuffers.*\n\n";
     }
     code += classcode;
     auto filename = NamespaceDir(ns) + defname + ".kt";
@@ -266,9 +265,9 @@ class KotlinGenerator : public BaseGenerator {
     GenerateCompanionObject(writer, [&]() {
       // Write all properties
       auto vals = enum_def.Vals();
+      auto field_type = GenTypeBasic(enum_def.underlying_type.base_type);
       for (auto it = vals.begin(); it != vals.end(); ++it) {
         auto &ev = **it;
-        auto field_type = GenTypeBasic(enum_def.underlying_type.base_type);
         auto val = enum_def.ToString(ev);
         auto suffix = LiteralSuffix(enum_def.underlying_type.base_type);
         writer.SetValue("name", Esc(ev.name));
@@ -300,9 +299,10 @@ class KotlinGenerator : public BaseGenerator {
           }
           writer += ")";
         });
-        GenerateFunOneLine(writer, "name", "e: Int", "String",
+        std::string e_param = "e: " + field_type;
+        GenerateFunOneLine(writer, "name", e_param, "String",
                            [&]() {
-                             writer += "names[e\\";
+                             writer += "names[e.toInt()\\";
                              if (enum_def.MinValue()->IsNonZero())
                                writer += " - " + enum_def.MinValue()->name +
                                          ".toInt()\\";
@@ -431,7 +431,7 @@ class KotlinGenerator : public BaseGenerator {
 
   std::string GenByteBufferLength(const char *bb_name) const {
     std::string bb_len = bb_name;
-    bb_len += ".capacity()";
+    bb_len += ".capacity";
     return bb_len;
   }
 
@@ -468,11 +468,11 @@ class KotlinGenerator : public BaseGenerator {
     {
       // Generate the __init() method that sets the field in a pre-existing
       // accessor object. This is to allow object reuse.
-      GenerateFun(writer, "__init", "_i: Int, _bb: ByteBuffer", "",
+      GenerateFun(writer, "__init", "_i: Int, _bb: ReadWriteBuffer", "",
                   [&]() { writer += "__reset(_i, _bb)"; });
 
       // Generate assign method
-      GenerateFun(writer, "__assign", "_i: Int, _bb: ByteBuffer",
+      GenerateFun(writer, "__assign", "_i: Int, _bb: ReadWriteBuffer",
                   Esc(struct_def.name), [&]() {
                     writer += "__init(_i, _bb)";
                     writer += "return this";
@@ -491,7 +491,7 @@ class KotlinGenerator : public BaseGenerator {
           // runtime.
           GenerateFunOneLine(
               writer, "validateVersion", "", "",
-              [&]() { writer += "Constants.FLATBUFFERS_2_0_0()"; },
+              [&]() { writer += "FLATBUFFERS_VERSION"; },
               options.gen_jvmstatic);
 
           GenerateGetRootAsAccessors(Esc(struct_def.name), writer, options);
@@ -550,15 +550,14 @@ class KotlinGenerator : public BaseGenerator {
            << ", ";
     params << "vectorLocation: Int, ";
     params << "key: " << GenTypeGet(key_field->value.type) << ", ";
-    params << "bb: ByteBuffer";
+    params << "bb: ReadWriteBuffer";
 
     auto statements = [&]() {
       auto base_type = key_field->value.type.base_type;
       writer.SetValue("struct_name", Esc(struct_def.name));
       if (base_type == BASE_TYPE_STRING) {
         writer +=
-            "val byteKey = key."
-            "toByteArray(java.nio.charset.StandardCharsets.UTF_8)";
+            "val byteKey = key.encodeToByteArray()";
       }
       writer += "var span = bb.getInt(vectorLocation - 4)";
       writer += "var start = 0";
@@ -855,7 +854,7 @@ class KotlinGenerator : public BaseGenerator {
       return;
     auto name = MakeCamel(Esc(struct_def.name), false);
     GenerateFunOneLine(
-        writer, name + "BufferHasIdentifier", "_bb: ByteBuffer", "Boolean",
+        writer, name + "BufferHasIdentifier", "_bb: ReadWriteBuffer", "Boolean",
         [&]() {
           writer += "__has_identifier(_bb, \"" + file_identifier + "\")";
         },
@@ -1086,7 +1085,7 @@ class KotlinGenerator : public BaseGenerator {
         //     get =  __vector_as_bytebuffer(14, 1)
 
         GenerateGetterOneLine(
-            writer, field_name + "AsByteBuffer", "ByteBuffer", [&]() {
+            writer, field_name + "AsByteBuffer", "ReadWriteBuffer", [&]() {
               writer.SetValue("end", end_idx);
               writer += "__vector_as_bytebuffer({{offset}}, {{end}})";
             });
@@ -1096,8 +1095,8 @@ class KotlinGenerator : public BaseGenerator {
         // fun inventoryInByteBuffer(_bb: Bytebuffer):
         //     ByteBuffer = __vector_as_bytebuffer(_bb, 14, 1)
         GenerateFunOneLine(
-            writer, field_name + "InByteBuffer", "_bb: ByteBuffer",
-            "ByteBuffer", [&]() {
+            writer, field_name + "InByteBuffer", "_bb: ReadWriteBuffer",
+            "ReadWriteBuffer", [&]() {
               writer.SetValue("end", end_idx);
               writer += "__vector_in_bytebuffer(_bb, {{offset}}, {{end}})";
             });
@@ -1175,7 +1174,7 @@ class KotlinGenerator : public BaseGenerator {
           };
 
           if (struct_def.fixed) {
-            GenerateFunOneLine(writer, name, params, "ByteBuffer", statements);
+            GenerateFunOneLine(writer, name, params, "ReadWriteBuffer", statements);
           } else {
             GenerateFun(writer, name, params, "Boolean", statements);
           }
@@ -1185,7 +1184,7 @@ class KotlinGenerator : public BaseGenerator {
     if (struct_def.has_key && !struct_def.fixed) {
       // Key Comparison method
       GenerateOverrideFun(
-          writer, "keysCompare", "o1: Int, o2: Int, _bb: ByteBuffer", "Int",
+          writer, "keysCompare", "o1: Int, o2: Int, _bb: ReadWriteBuffer", "Int",
           [&]() {
             if (IsString(key_field->value.type)) {
               writer.SetValue("offset", NumToString(key_field->value.offset));
@@ -1290,7 +1289,7 @@ class KotlinGenerator : public BaseGenerator {
 
     // create convenience method that doesn't require an existing object
     GenerateJvmStaticAnnotation(writer, options.gen_jvmstatic);
-    writer += "fun {{gr_method}}(_bb: ByteBuffer): {{gr_name}} = \\";
+    writer += "fun {{gr_method}}(_bb: ReadWriteBuffer): {{gr_name}} = \\";
     writer += "{{gr_method}}(_bb, {{gr_name}}())";
 
     // create method that allows object reuse
@@ -1298,12 +1297,11 @@ class KotlinGenerator : public BaseGenerator {
     GenerateJvmStaticAnnotation(writer, options.gen_jvmstatic);
     writer +=
         "fun {{gr_method}}"
-        "(_bb: ByteBuffer, obj: {{gr_name}}): {{gr_name}} {";
+        "(_bb: ReadWriteBuffer, obj: {{gr_name}}): {{gr_name}} {";
     writer.IncrementIdentLevel();
-    writer += "_bb.order(ByteOrder.LITTLE_ENDIAN)";
     writer +=
-        "return (obj.__assign(_bb.getInt(_bb.position())"
-        " + _bb.position(), _bb))";
+        "return (obj.__assign(_bb.getInt(_bb.limit)"
+        " + _bb.limit, _bb))";
     writer.DecrementIdentLevel();
     writer += "}";
   }

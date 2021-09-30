@@ -17,6 +17,7 @@
 
 package com.google.flatbuffers.kotlin
 
+@ExperimentalUnsignedTypes
 public class FlexBuffersBuilder(
   public val buffer: ReadWriteBuffer,
   private val shareFlag: Int = SHARE_KEYS

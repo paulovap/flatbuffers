@@ -1,15 +1,33 @@
-plugins {
-  id("com.diffplug.spotless") version "5.8.2"
-}
+import org.gradle.internal.impldep.org.testng.ITestResult.STARTED
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.nio.charset.StandardCharsets
 
-group = "com.google.flatbuffers"
-version = "2.0.0-SNAPSHOT"
+plugins {
+  id("com.diffplug.spotless") version "6.1.0"
+}
 
 subprojects {
 
   repositories {
     maven { setUrl("https://plugins.gradle.org/m2/") }
     mavenCentral()
+  }
+
+  subprojects {
+
+    tasks.withType<KotlinCompile>().configureEach {
+      kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8.toString()
+        @Suppress("SuspiciousCollectionReassignment")
+        freeCompilerArgs += "-Xjvm-default=all"
+      }
+    }
+
+    tasks.withType<JavaCompile> {
+      options.encoding = StandardCharsets.UTF_8.toString()
+      sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+      targetCompatibility = JavaVersion.VERSION_1_8.toString()
+    }
   }
 }
 
@@ -37,4 +55,19 @@ spotless {
     target("*.gradle.kts")
     ktlint().userData(klintConfig)
   }
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+  kotlinOptions {
+    jvmTarget = JavaVersion.VERSION_1_8.toString()
+    @Suppress("SuspiciousCollectionReassignment")
+    freeCompilerArgs += "-Xjvm-default=all -Xextended-compiler-checks"
+
+  }
+}
+
+tasks.withType<JavaCompile> {
+  options.encoding = StandardCharsets.UTF_8.toString()
+  sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+  targetCompatibility = JavaVersion.VERSION_1_8.toString()
 }

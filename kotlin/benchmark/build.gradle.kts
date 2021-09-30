@@ -1,11 +1,9 @@
-import org.jetbrains.kotlin.ir.backend.js.compile
-
 plugins {
-  kotlin("multiplatform") version "1.4.20"
-  id("org.jetbrains.kotlin.plugin.allopen") version "1.4.20"
-  id("org.jetbrains.kotlinx.benchmark") version "0.3.0"
+  kotlin("multiplatform")
+  id("org.jetbrains.kotlin.plugin.allopen") version deps.kotlin.version
+  id("org.jetbrains.kotlinx.benchmark") version "0.3.1"
   id("io.morethan.jmhreport") version "0.9.0"
-  id("de.undercouch.download") version "4.1.1"
+  id("de.undercouch.download")
 }
 
 // allOpen plugin is needed for the benchmark annotations.
@@ -45,19 +43,10 @@ benchmark {
 kotlin {
   jvm {
     withJava()
-    compilations.all {
-      kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_1_8.toString()
-      }
-    }
   }
 
   sourceSets {
 
-    all {
-      languageSettings.enableLanguageFeature("InlineClasses")
-      languageSettings.useExperimentalAnnotation("kotlin.ExperimentalUnsignedTypes")
-    }
 
     val commonTest by getting {
       dependencies {

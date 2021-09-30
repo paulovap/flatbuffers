@@ -17,13 +17,18 @@
 
 package com.google.flatbuffers.kotlin
 
-public inline class BitWidth(public val value: Int) {
+import kotlin.jvm.JvmInline
+
+@JvmInline
+public value class BitWidth(public val value: Int) {
   public inline fun max(other: BitWidth): BitWidth = if (this.value >= other.value) this else other
 }
 
-public inline class ByteWidth(public val value: Int)
+@JvmInline
+public value class ByteWidth(public val value: Int)
 
-public inline class FlexBufferType(public val value: Int) {
+@JvmInline
+public value class FlexBufferType(public val value: Int) {
   public operator fun minus(other: FlexBufferType): FlexBufferType = FlexBufferType(this.value - other.value)
   public operator fun plus(other: FlexBufferType): FlexBufferType = FlexBufferType(this.value + other.value)
   public operator fun compareTo(other: FlexBufferType): Int = this.value - other.value
@@ -199,7 +204,6 @@ internal fun FlexBufferType.typeToString(): String = when (this) {
 }
 
 // Few repeated values used in hot path is cached here
-internal val emptyBuffer = ArrayReadWriteBuffer(1)
 internal fun emptyBlob() = Blob(emptyBuffer, 1, ByteWidth(1))
 internal fun emptyVector() = Vector(emptyBuffer, 1, ByteWidth(1))
 internal fun emptyMap() = Map(ArrayReadWriteBuffer(3), 3, ByteWidth(1))

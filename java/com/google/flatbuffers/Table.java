@@ -55,6 +55,7 @@ public class Table {
 
   protected static int __offset(int vtable_offset, int offset, ByteBuffer bb) {
     int vtable = bb.capacity() - offset;
+    System.out.println(String.format("__offset(limit=%d, vtable_offset=%s, offset=%d, vtable=%d, pos=%d", bb.capacity(), vtable_offset, offset,vtable, vtable + vtable_offset - bb.getInt(vtable)));
     return bb.getShort(vtable + vtable_offset - bb.getInt(vtable)) + vtable;
   }
 

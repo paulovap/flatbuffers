@@ -43,7 +43,7 @@ public class Reference internal constructor(
   internal val end: Int,
   internal val parentWidth: ByteWidth,
   internal val byteWidth: ByteWidth,
-  internal val type: FlexBufferType
+  public val type: FlexBufferType
 ) {
 
   internal constructor(bb: ReadBuffer, end: Int, parentWidth: ByteWidth, packedType: Int) :
@@ -869,14 +869,14 @@ public class Map internal constructor(buffer: ReadBuffer, end: Int, byteWidth: B
     while (otherPos < otherLimit) {
       val c2 = other[otherPos]
       // not a single byte codepoint
-      if (c2.toInt() >= 0x80) {
+      if (c2.code >= 0x80) {
         break
       }
       val b: Byte = buffer[bufferPos]
       when {
-        b == ZeroByte -> return -c2.toInt()
+        b == ZeroByte -> return -c2.code
         b < 0 -> break
-        b != c2.toByte() -> return b - c2.toByte()
+        b != c2.toByte() -> return b - c2.code.toByte()
       }
       ++bufferPos
       ++otherPos

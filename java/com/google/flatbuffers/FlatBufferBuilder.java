@@ -53,6 +53,9 @@ public class FlatBufferBuilder {
     Map<String, Integer> string_pool; // map used to cache shared strings.
     /// @endcond
 
+    private void d(String msg) {
+        System.out.println(msg);
+    }
 
     /**
      * Maximum size of buffer to allocate. If we're allocating arrays on the heap,
@@ -296,6 +299,7 @@ public class FlatBufferBuilder {
     * @param byte_size Number of bytes to add.
     */
     public void pad(int byte_size) {
+        d(String.format("pad(space=%s, byteSize=%s", space, byte_size));
         for (int i = 0; i < byte_size; i++) bb.put(--space, (byte)0);
     }
 
@@ -325,6 +329,7 @@ public class FlatBufferBuilder {
             }
             space += bb.capacity() - old_buf_size;
         }
+        d(String.format("prep(space=%s, size=%s, additionalBytes=%s", space, size, additional_bytes));
         pad(align_size);
     }
 
@@ -334,7 +339,9 @@ public class FlatBufferBuilder {
      *
      * @param x A `boolean` to put into the buffer.
      */
-    public void putBoolean(boolean x) { bb.put      (space -= Constants.SIZEOF_BYTE, (byte)(x ? 1 : 0)); }
+    public void putBoolean(boolean x) { 
+        d(String.format("putBoolean(space=%s, x=%s", space, x));
+        bb.put      (space -= Constants.SIZEOF_BYTE, (byte)(x ? 1 : 0)); }
 
     /**
      * Add a `byte` to the buffer, backwards from the current location. Doesn't align nor
@@ -342,7 +349,9 @@ public class FlatBufferBuilder {
      *
      * @param x A `byte` to put into the buffer.
      */
-    public void putByte   (byte    x) { bb.put      (space -= Constants.SIZEOF_BYTE, x); }
+    public void putByte   (byte    x) { 
+        d(String.format("putByte(space=%s, x=%s", space, x));
+        bb.put      (space -= Constants.SIZEOF_BYTE, x); }
 
     /**
      * Add a `short` to the buffer, backwards from the current location. Doesn't align nor
@@ -350,7 +359,9 @@ public class FlatBufferBuilder {
      *
      * @param x A `short` to put into the buffer.
      */
-    public void putShort  (short   x) { bb.putShort (space -= Constants.SIZEOF_SHORT, x); }
+    public void putShort  (short   x) { 
+        d(String.format("putShort(space=%s, x=%s", space, x));
+        bb.putShort (space -= Constants.SIZEOF_SHORT, x); }
 
     /**
      * Add an `int` to the buffer, backwards from the current location. Doesn't align nor
@@ -358,7 +369,9 @@ public class FlatBufferBuilder {
      *
      * @param x An `int` to put into the buffer.
      */
-    public void putInt    (int     x) { bb.putInt   (space -= Constants.SIZEOF_INT, x); }
+    public void putInt    (int     x) { 
+        d(String.format("putInt(space=%s, x=%s", space, x));
+        bb.putInt   (space -= Constants.SIZEOF_INT, x); }
 
     /**
      * Add a `long` to the buffer, backwards from the current location. Doesn't align nor
@@ -366,7 +379,9 @@ public class FlatBufferBuilder {
      *
      * @param x A `long` to put into the buffer.
      */
-    public void putLong   (long    x) { bb.putLong  (space -= Constants.SIZEOF_LONG, x); }
+    public void putLong   (long    x) { 
+        d(String.format("putLong(space=%s, x=%s", space, x));
+        bb.putLong  (space -= Constants.SIZEOF_LONG, x); }
 
     /**
      * Add a `float` to the buffer, backwards from the current location. Doesn't align nor
@@ -374,7 +389,9 @@ public class FlatBufferBuilder {
      *
      * @param x A `float` to put into the buffer.
      */
-    public void putFloat  (float   x) { bb.putFloat (space -= Constants.SIZEOF_FLOAT, x); }
+    public void putFloat  (float   x) { 
+        d(String.format("putFloat(space=%s, x=%s", space, x));
+        bb.putFloat (space -= Constants.SIZEOF_FLOAT, x); }
 
     /**
      * Add a `double` to the buffer, backwards from the current location. Doesn't align nor
@@ -382,7 +399,9 @@ public class FlatBufferBuilder {
      *
      * @param x A `double` to put into the buffer.
      */
-    public void putDouble (double  x) { bb.putDouble(space -= Constants.SIZEOF_DOUBLE, x); }
+    public void putDouble (double  x) { 
+        d(String.format("putDouble(space=%s, x=%s", space, x));
+        bb.putDouble(space -= Constants.SIZEOF_DOUBLE, x); }
     /// @endcond
 
     /**
@@ -747,6 +766,7 @@ public class FlatBufferBuilder {
         Arrays.fill(vtable, 0, vtable_in_use, 0);
         nested = true;
         object_start = offset();
+        d(String.format("startTable(numfields=%s, objectStart=%s", numfields, object_start));
     }
 
     /**
@@ -858,6 +878,7 @@ public class FlatBufferBuilder {
      * buffer.
      */
     public void slot(int voffset) {
+        d(String.format("slot(voffset=%s",voffset));
         vtable[voffset] = offset();
     }
 
@@ -921,6 +942,7 @@ public class FlatBufferBuilder {
         }
 
         nested = false;
+        d(String.format("endTable(space=%s", space));
         return vtableloc;
     }
 
@@ -1078,6 +1100,7 @@ public class FlatBufferBuilder {
     * @return A full copy of the {@link #dataBuffer() data buffer}.
     */
     public byte[] sizedByteArray() {
+        System.out.println(String.format("XXspace %d length: %s", space, bb.capacity() - space));
         return sizedByteArray(space, bb.capacity() - space);
     }
 
